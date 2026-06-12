@@ -1,4 +1,4 @@
-from .dkkung_altair_theme import *
+from .theme import *
 from .colors import *
 from .helpers import *
 

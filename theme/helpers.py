@@ -25,7 +25,7 @@ def palette_range(
     Parameters
     ----------
     name:
-        Key in the ``colors`` dict (e.g. ``"mpl_YlGnBu"``, ``"dkkung_greys"``).
+        Key in the ``colors`` dict (e.g. ``"mpl_YlGnBu"``).
     n:
         Number of colors to return (linspace mode). Ignored when ``step`` is set.
     start:
@@ -108,7 +108,7 @@ def beeswarm_offsets(
             .with_row_index("__idx")
             .group_by(["Metadata_Treatment", "Metadata_Time"])
             .map_groups(lambda g: g.with_columns(
-                pl.Series("beeswarm_x", dkkung_altair_theme.beeswarm_offsets(
+                pl.Series("beeswarm_x", theme.beeswarm_offsets(
                     g["my_column"].to_numpy(),
                     height_px=200,
                     mark_size=10,
@@ -147,10 +147,12 @@ def beeswarm_offsets(
         y = y_px[idx]
         nearby = np.abs(placed_y[:n_placed] - y) <= 4 * r
         for k in range(1000):
-            for cx in ([0.0] if k == 0 else [k * step, -k * step]):
+            for cx in [0.0] if k == 0 else [k * step, -k * step]:
                 ny = placed_y[:n_placed][nearby]
                 nx = placed_x[:n_placed][nearby]
-                if len(ny) == 0 or np.all((ny - y) ** 2 + (nx - cx) ** 2 >= min_dist_sq):
+                if len(ny) == 0 or np.all(
+                    (ny - y) ** 2 + (nx - cx) ** 2 >= min_dist_sq
+                ):
                     placed_y[n_placed] = y
                     placed_x[n_placed] = cx
                     n_placed += 1
@@ -205,7 +207,7 @@ def add_beeswarm_offsets(
     --------
     ::
 
-        df = dkkung_altair_theme.add_beeswarm_offsets(
+        df = theme.add_beeswarm_offsets(
             df,
             y_col="percent",
             group_by=["Metadata_Treatment", "Metadata_Time"],
@@ -220,17 +222,21 @@ def add_beeswarm_offsets(
         )
     """
     return (
-        df
-        .with_row_index("__beeswarm_idx")
+        df.with_row_index("__beeswarm_idx")
         .group_by(group_by)
-        .map_groups(lambda g: g.with_columns(
-            pl.Series(out_col, beeswarm_offsets(
-                g[y_col].to_numpy(),
-                height_px=height_px,
-                mark_size=mark_size,
-                step=step,
-            ))
-        ))
+        .map_groups(
+            lambda g: g.with_columns(
+                pl.Series(
+                    out_col,
+                    beeswarm_offsets(
+                        g[y_col].to_numpy(),
+                        height_px=height_px,
+                        mark_size=mark_size,
+                        step=step,
+                    ),
+                )
+            )
+        )
         .sort("__beeswarm_idx")
         .drop("__beeswarm_idx")
     )

@@ -1,6 +1,6 @@
 colors = {
     # --- custom palettes ---
-    "dkkung_greys": [
+    "greys": [
         "#221F20",
         "#414042",
         "#58595B",
@@ -13,7 +13,7 @@ colors = {
         "#E7E7E8",
         "#F1F2F2",
     ],
-    "dkkung_discrete": [
+    "discrete": [
         "#EFF9BD",
         "#D4EEB4",
         "#A9DDB7",

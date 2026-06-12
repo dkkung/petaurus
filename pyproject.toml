@@ -1,5 +1,5 @@
 [project]
-name = "altair-themes"
+name = "dkkung-altair-theme"
 version = "0.1.0"
 description = "Custom global themes for altair."
 readme = "README.md"
