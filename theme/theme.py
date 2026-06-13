@@ -20,10 +20,10 @@ def options(
     dashedLine=False,
     dashedRule=True,
     dashedWidth=[2, 2],
-    font="Helvetica Neue",
+    font="HelveticaNeue",
     fontSize=7,
-    fontStyle="Normal",
-    fontWeight=400,  # only multiples of 100; 300 = light, 400 = normal/regular
+    fontStyle="normal",
+    fontWeight=400,  # only multiples of 100; 300 = light, 400 = normal/regular; 700 = bold
     grid=False,
     gridColor="darkGray",
     legend=True,
