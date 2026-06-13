@@ -163,6 +163,10 @@ def custom():
                 "strokeWidth": opts["markStrokeWidth"],
             },
             "boxplot": {
+                "ticks": {
+                    "size": opts["markSize"],
+                    "thickness": opts["markStrokeWidth"],
+                },
                 "box": {
                     # 'fill': opts['markFillColor'],
                     "fillOpacity": opts["markFillOpacity"],

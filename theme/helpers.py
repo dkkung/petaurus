@@ -249,6 +249,56 @@ def add_beeswarm_offsets(
     )
 
 
+def add_jitter_offsets(
+    df: pl.DataFrame,
+    scale: float = 5.0,
+    out_col: str = "jitter_x",
+    seed: int | None = 2022_07_01,
+) -> pl.DataFrame:
+    """
+    Add a column of random Gaussian x-offsets to a Polars DataFrame.
+
+    Each point receives an independent offset drawn from N(0, scale). Use the
+    result as an ``xOffset`` column in Altair to jitter points horizontally.
+
+    Unlike :func:`add_beeswarm_offsets`, there is no collision avoidance —
+    points can overlap. This is faster and simpler for large datasets where
+    some overlap is acceptable.
+
+    Parameters
+    ----------
+    df:
+        Input DataFrame.
+    scale:
+        Standard deviation of the jitter in pixels.
+    out_col:
+        Name of the output offset column added to the DataFrame.
+    seed:
+        Optional random seed for reproducibility.
+
+    Returns
+    -------
+    polars.DataFrame
+        Original DataFrame with an additional ``out_col`` column.
+
+    Examples
+    --------
+    ::
+
+        df = theme.add_jitter_offsets(df, scale=5)
+
+        alt.Chart(df).mark_circle().encode(
+            x=alt.X("group:N"),
+            y=alt.Y("value:Q"),
+            xOffset=alt.XOffset("jitter_x:Q"),
+        )
+    """
+    rng = np.random.default_rng(seed)
+    return df.with_columns(
+        pl.Series(out_col, rng.normal(0, scale, len(df)))
+    )
+
+
 def _format_pvalue(p: float, decimals: int = 3) -> str:
     if p < 0.001:
         return "p < 0.001"
