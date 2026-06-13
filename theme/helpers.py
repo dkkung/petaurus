@@ -1,5 +1,6 @@
 import numpy as np
 import polars as pl
+import altair as alt
 
 from .colors import colors
 
@@ -246,3 +247,190 @@ def add_beeswarm_offsets(
         .sort("__beeswarm_idx")
         .drop("__beeswarm_idx")
     )
+
+
+def _format_pvalue(p: float) -> str:
+    if p < 0.001:
+        return "p < 0.001"
+    elif p < 0.01:
+        return "p < 0.01"
+    elif p < 0.05:
+        return "p < 0.05"
+    else:
+        return f"p = {p:.2f}"
+
+
+def pvalue_layer(
+    df: pl.DataFrame | None = None,
+    x_col: str | None = None,
+    y_col: str | None = None,
+    group1: str | None = None,
+    group2: str | None = None,
+    *,
+    test: str = "mannwhitneyu",
+    pvalue: float | None = None,
+    correction: str | None = None,
+    n_comparisons: int = 1,
+    y: float | None = None,
+    y_pad: float = 5,
+    tick_height: float = 5,
+    style: str = "bracket",
+    categories: list | None = None,
+    chart_width: int = 400,
+    stroke_width: float = 0.5,
+    font_size: int = 7,
+) -> alt.LayerChart:
+    """
+    Build an Altair layer with a p-value annotation between two groups.
+
+    Combine with your chart using ``+``:  ``chart + pvalue_layer(...)``.
+
+    Parameters
+    ----------
+    df:
+        Polars DataFrame. Required unless both ``pvalue`` and ``y`` are provided.
+    x_col:
+        Column name for the grouping variable (x-axis).
+    y_col:
+        Column name for the value variable (y-axis). Used to extract group
+        data for the test and to auto-place the bracket when ``y`` is omitted.
+    group1, group2:
+        Values in ``x_col`` identifying the two groups to compare.
+    test:
+        Scipy test to run: ``'mannwhitneyu'``, ``'ttest_ind'``, ``'ttest_rel'``,
+        or ``'wilcoxon'``. Ignored when ``pvalue`` is provided.
+    pvalue:
+        Pre-computed p-value. Skips the statistical test entirely.
+    correction:
+        Multiple comparison correction: ``'bonferroni'`` or ``None``.
+    n_comparisons:
+        Total number of comparisons for Bonferroni correction.
+    y:
+        Y position of the bracket in data units. Defaults to
+        ``max(group data) + y_pad``.
+    y_pad:
+        Padding above the group maximum when ``y`` is auto-placed.
+    tick_height:
+        Height of the bracket end ticks in data units.
+    style:
+        ``'bracket'`` (horizontal bar + end ticks) or ``'line'`` (bar only).
+    categories:
+        Ordered list of all x-axis categories, used to compute the midpoint
+        pixel position for the text label. Inferred from ``df`` if not provided
+        (sorted alphabetically, matching Vega-Lite's default nominal ordering).
+    chart_width:
+        Width of the chart in pixels. Used with ``categories`` to compute
+        text x position. Should match ``.properties(width=...)``.
+    stroke_width:
+        Stroke width of bracket lines.
+    font_size:
+        Font size of the p-value label in points.
+
+    Examples
+    --------
+    From a DataFrame::
+
+        chart = alt.Chart(df).mark_point().encode(x="group:N", y="value:Q")
+        ann = theme.pvalue_layer(
+            df, "group", "value", "Control", "Drug A",
+            test="mannwhitneyu", y=210,
+            categories=["Control", "Drug A", "Drug B"],
+            chart_width=300,
+        )
+        chart + ann
+
+    From a pre-computed p-value::
+
+        _, p = scipy.stats.mannwhitneyu(ctrl, drug_a)
+        ann = theme.pvalue_layer(
+            group1="Control", group2="Drug A",
+            pvalue=p, y=210,
+            categories=["Control", "Drug A", "Drug B"],
+            chart_width=300,
+        )
+    """
+    from scipy import stats as _stats
+
+    # --- p-value ---
+    if pvalue is None:
+        if df is None or x_col is None or y_col is None:
+            raise ValueError("df, x_col, and y_col are required when pvalue is not provided.")
+        a = df.filter(pl.col(x_col) == group1)[y_col].to_numpy()
+        b = df.filter(pl.col(x_col) == group2)[y_col].to_numpy()
+        _tests = {
+            "mannwhitneyu": lambda: _stats.mannwhitneyu(a, b, alternative="two-sided").pvalue,
+            "ttest_ind":    lambda: _stats.ttest_ind(a, b).pvalue,
+            "ttest_rel":    lambda: _stats.ttest_rel(a, b).pvalue,
+            "wilcoxon":     lambda: _stats.wilcoxon(a, b).pvalue,
+        }
+        if test not in _tests:
+            raise ValueError(f"Unknown test {test!r}. Choose from: {list(_tests)}")
+        pvalue = _tests[test]()
+
+    if correction == "bonferroni":
+        pvalue = min(pvalue * n_comparisons, 1.0)
+
+    label = _format_pvalue(pvalue)
+
+    # --- y position ---
+    if y is None:
+        if df is None or x_col is None or y_col is None:
+            raise ValueError("y is required when df, x_col, and y_col are not provided.")
+        y = float(df.filter(pl.col(x_col).is_in([group1, group2]))[y_col].max()) + y_pad
+
+    # --- categories and text x position ---
+    if categories is None:
+        if df is None or x_col is None:
+            raise ValueError("categories is required when df and x_col are not provided.")
+        categories = sorted(df[x_col].unique().to_list())
+
+    band_w = chart_width / len(categories)
+    g1_idx = categories.index(group1)
+    g2_idx = categories.index(group2)
+    x_mid_px = ((g1_idx + g2_idx + 1) / 2) * band_w
+
+    # --- layers ---
+    _rule_kwargs = {"strokeWidth": stroke_width, "strokeDash": [0, 0]}
+
+    bar = (
+        alt.Chart(alt.Data(values=[{"x": group1, "x2": group2, "y": y}]))
+        .mark_rule(**_rule_kwargs)
+        .encode(
+            x=alt.X("x:N"),
+            x2="x2:N",
+            y=alt.Y("y:Q"),
+        )
+    )
+
+    text = (
+        alt.Chart(alt.Data(values=[{"y": y, "label": label}]))
+        .mark_text(align="center", fontSize=font_size, dy=-6)
+        .encode(
+            x=alt.value(x_mid_px),
+            y=alt.Y("y:Q"),
+            text="label:N",
+        )
+    )
+
+    if style == "bracket":
+        left_tick = (
+            alt.Chart(alt.Data(values=[{"x": group1, "y": y, "y2": y - tick_height}]))
+            .mark_rule(**_rule_kwargs)
+            .encode(
+                x=alt.X("x:N"),
+                y=alt.Y("y:Q"),
+                y2="y2:Q",
+            )
+        )
+        right_tick = (
+            alt.Chart(alt.Data(values=[{"x": group2, "y": y, "y2": y - tick_height}]))
+            .mark_rule(**_rule_kwargs)
+            .encode(
+                x=alt.X("x:N"),
+                y=alt.Y("y:Q"),
+                y2="y2:Q",
+            )
+        )
+        return alt.layer(bar, left_tick, right_tick, text)
+
+    return alt.layer(bar, text)
