@@ -172,6 +172,7 @@ def custom():
             },
             "boxplot": {
                 "ticks": {
+                    "fill": "white" if opts["darkmode"] else "black",
                     "size": opts["markSize"],
                     "thickness": opts["markStrokeWidth"],
                 },
@@ -215,7 +216,7 @@ def custom():
                 "fill": "white",
                 "fillOpacity": opts["markFillOpacity"],
                 "size": opts["markSize"],
-                "stroke": "white" if opts["darkmode"] else opts["markStrokeColor"],
+                "stroke": "black" if opts["darkmode"] else opts["markStrokeColor"],
                 "strokeOpacity": opts["markStrokeOpacity"],
                 "strokeWidth": opts["markStrokeWidth"],
             },
