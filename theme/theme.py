@@ -18,7 +18,7 @@ def options(
     axisWidth=0.50,
     bandPadding=0.1,
     closed=None,  # None = auto (True if viewFill is set, else False); set explicitly to override
-    chartFill=None,
+    chartFill=None,  # defaults to "white" (light) or "#1e1e1e" (dark) based on darkmode
     chartHeight=100,
     chartWidth=100,
     darkmode=False,
@@ -46,7 +46,7 @@ def options(
     strokeCap="round",  # "butt" | "round" | "square"
     ticks=True,
     tickSize=5,
-    transparentBackground=True,
+    transparentBackground=False,
     verticalY=False,
     viewFill=None,  # setting a color auto-enables closed
     xTicks=True,
@@ -63,6 +63,8 @@ def options(
         markSize = min(chartWidth, chartHeight) * 0.1
     if markStrokeWidth is None:
         markStrokeWidth = axisWidth
+    if chartFill is None and not darkmode:
+        chartFill = "white"
 
     alt.theme.options = {}  # must reset options to remove stale keys
     alt.theme.options["angledX"] = angledX
@@ -113,7 +115,7 @@ def custom():
     opts = alt.theme.options
     return {
         "background": (
-            None if opts["transparentBackground"] or opts["darkmode"] else opts["chartFill"]
+            None if opts["transparentBackground"] else opts["chartFill"]
         ),  # background of the entire view
         "config": {
             "area": {

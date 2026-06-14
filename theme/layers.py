@@ -362,8 +362,10 @@ def save(
 
     base = Path(filename)
     original_darkmode = alt.theme.options.get("darkmode", False)
+    original_transparent = alt.theme.options.get("transparentBackground", False)
 
     try:
+        alt.theme.options["transparentBackground"] = True
         for mode, suffix in [(False, "_light"), (True, "_dark")]:
             alt.theme.options["darkmode"] = mode
             chart.save(str(base.parent / f"{base.name}{suffix}.png"), ppi=ppi)
@@ -372,6 +374,7 @@ def save(
             _simplify_svg(svg_path)
     finally:
         alt.theme.options["darkmode"] = original_darkmode
+        alt.theme.options["transparentBackground"] = original_transparent
 
 
 def _simplify_svg(path: str) -> None:
