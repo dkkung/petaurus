@@ -302,6 +302,142 @@ def add_jitter_offsets(
     )
 
 
+def mark_violin(
+    df: pl.DataFrame,
+    x_col: str,
+    y_col: str,
+    categories: list[str],
+    *,
+    boxplot_size: int = 8,
+    boxplot_color: str = "black",
+    violin_color: str | None = None,
+    fillOpacity: float | None = None,
+    stroke: str | None = None,
+    strokeWidth: float | None = None,
+    steps: int = 200,
+) -> alt.LayerChart:
+    """
+    Build an Altair layer combining a violin plot behind a boxplot.
+
+    Returns a ``LayerChart`` that can be saved directly or composed with other
+    layers (e.g. ``theme.pvalue_layer``).
+
+    Parameters
+    ----------
+    df:
+        Polars DataFrame containing the data.
+    x_col:
+        Column name for the grouping variable (x-axis).
+    y_col:
+        Column name for the value variable (y-axis).
+    categories:
+        Ordered list of all x-axis categories, used for positioning and
+        axis labels.
+    boxplot_size:
+        Width of the boxplot box in pixels.
+    boxplot_color:
+        Fill color of the boxplot.
+    violin_color:
+        Fill color of the violin. Defaults to the mid-grey from the theme's
+        ``greys`` palette.
+    stroke:
+        Outline color of the violin. Defaults to ``None`` (no outline).
+    strokeWidth:
+        Width of the violin outline.
+    steps:
+        Number of y grid points used for KDE estimation.
+
+    Examples
+    --------
+    ::
+
+        theme.options(chartWidth=250)
+        chart = theme.mark_violin(df, "group", "value", CATEGORIES)
+        theme.save(chart, "violin")
+
+        # with optional outline and custom colors
+        chart = theme.mark_violin(
+            df, "group", "value", CATEGORIES,
+            boxplot_size=10,
+            violin_color="#AAAAAA",
+            stroke="black",
+            strokeWidth=0.5,
+        )
+    """
+    from scipy.stats import gaussian_kde
+
+    if fillOpacity is None:
+        fillOpacity = alt.theme.options.get("markFillOpacity", 1.0)
+    if strokeWidth is None:
+        strokeWidth = alt.theme.options.get("markStrokeWidth", 0.5)
+
+    chartWidth = alt.theme.options.get("chartWidth", 150)
+    n_groups = len(categories)
+    density_scale = 1.5 * boxplot_size * n_groups / chartWidth
+
+    group_idx = {g: i for i, g in enumerate(categories)}
+
+    violin_rows = []
+    for group in categories:
+        i = group_idx[group]
+        vals = df.filter(pl.col(x_col) == group)[y_col].to_numpy()
+        y_grid = np.linspace(float(vals.min()) - 1, float(vals.max()) + 1, steps)
+        kde = gaussian_kde(vals)
+        density = kde(y_grid)
+        density_norm = density / density.max() * density_scale
+
+        for order, (y, d) in enumerate(zip(y_grid, density_norm)):
+            violin_rows.append({"__group": group, "__y": float(y), "__x": float(i) + d, "__order": order})
+        for order, (y, d) in enumerate(zip(reversed(y_grid), reversed(density_norm))):
+            violin_rows.append({"__group": group, "__y": float(y), "__x": float(i) - d, "__order": steps + order})
+
+    violin_df = pl.DataFrame(violin_rows)
+
+    df_pos = df.with_columns(
+        pl.col(x_col).replace(group_idx).cast(pl.Float64).alias("__x_pos")
+    )
+
+    x_domain = [-0.6, n_groups - 0.4]
+    label_expr = "[" + ", ".join(f"'{g}'" for g in categories) + "][round(datum.value)]"
+    x_axis = alt.Axis(
+        values=list(range(n_groups)),
+        labelExpr=label_expr,
+        labelAngle=-45,
+        labelAlign="right",
+    )
+
+    mark_kwargs = {"filled": True, "strokeWidth": strokeWidth, "fillOpacity": fillOpacity}
+    if stroke is not None:
+        mark_kwargs["stroke"] = stroke
+
+    violin = (
+        alt.Chart(violin_df)
+        .mark_line(**mark_kwargs)
+        .encode(
+            y=alt.Y("__y:Q", title=y_col),
+            x=alt.X("__x:Q", title=x_col, scale=alt.Scale(domain=x_domain), axis=x_axis),
+            order=alt.Order("__order:Q"),
+            color=alt.Color(
+                "__group:N",
+                sort=categories,
+                legend=None,
+                **({"scale": alt.Scale(range=[violin_color])} if violin_color is not None else {}),
+            ),
+        )
+    )
+
+    boxplot = (
+        alt.Chart(df_pos)
+        .mark_boxplot(color=boxplot_color, size=boxplot_size, ticks=False)
+        .encode(
+            x=alt.X("__x_pos:Q", scale=alt.Scale(domain=x_domain)),
+            y=alt.Y(f"{y_col}:Q", title=y_col),
+        )
+    )
+
+    return alt.layer(violin, boxplot)
+
+
 def save(
     chart: alt.Chart,
     filename: str,
