@@ -13,10 +13,10 @@ register.
 
 def options(
     angledX=False,
-    axisOffset=None,  # defaults to tickSize if not set, or 0 if border is True
+    axisOffset=None,  # defaults to tickSize if not set, or 0 if closed is True
     axisWidth=0.50,
     bandPadding=0.1,
-    border=False,
+    closed=False,  # whether to add a closed border around the entire plot area
     chartHeight=150,
     chartWidth=150,
     darkmode=False,
@@ -88,7 +88,7 @@ def options(
     alt.theme.options["ticks"] = ticks
     alt.theme.options["tickSize"] = tickSize
     alt.theme.options["tickWidth"] = axisWidth
-    alt.theme.options["border"] = border
+    alt.theme.options["closed"] = closed
     alt.theme.options["transparentBackground"] = transparentBackground
     alt.theme.options["verticalY"] = verticalY
     alt.theme.options["viewBackgroundColor"] = viewBackgroundColor
@@ -131,7 +131,7 @@ def custom():
                 "labelFontStyle": opts["fontStyle"],
                 "labelFontWeight": opts["fontWeight"],
                 "offset": 0
-                if opts["border"]
+                if opts["closed"]
                 else (
                     opts["axisOffset"]
                     if opts["axisOffset"] is not None
@@ -154,7 +154,9 @@ def custom():
                 ),  # keep label alignment distinct between X & Y
                 "labelAngle": 315 if opts["angledX"] else 0,
                 "ticks": True if opts["xTicks"] and opts["ticks"] else False,
-                "translate": 0 if opts["border"] else 0.5,  # sub-pixel shift so axis domain line falls on a pixel boundary; 0 when border=True so domain line aligns with view stroke
+                "translate": 0
+                if opts["closed"]
+                else 0.5,  # sub-pixel shift so axis domain line falls on a pixel boundary; 0 when closed=True so domain line aligns with view stroke
             },
             "axisY": {
                 "labelAlign": (
@@ -365,7 +367,7 @@ def custom():
                     else opts["viewBackgroundColor"]
                 ),
                 "stroke": ("white" if opts["darkmode"] else "black")
-                if opts["border"]
+                if opts["closed"]
                 else None,
                 "strokeWidth": opts["axisWidth"],
             },
