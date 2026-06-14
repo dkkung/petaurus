@@ -147,9 +147,6 @@ def custom():
                 "titleFontSize": opts["fontSize"],
                 "titleFontStyle": opts["fontStyle"],
                 "titleFontWeight": opts["fontWeight"],
-                "translate": 0
-                if opts["border"]
-                else 0.5,  # translate=0 aligns the border stroke with the axis domain; trade-off is a ~0.5px offset between axis ticks and mark centers when border=True
             },
             "axisX": {
                 "labelAlign": (
@@ -157,6 +154,7 @@ def custom():
                 ),  # keep label alignment distinct between X & Y
                 "labelAngle": 315 if opts["angledX"] else 0,
                 "ticks": True if opts["xTicks"] and opts["ticks"] else False,
+                "translate": 0 if opts["border"] else 0.5,  # sub-pixel shift so axis domain line falls on a pixel boundary; 0 when border=True so domain line aligns with view stroke
             },
             "axisY": {
                 "labelAlign": (
@@ -164,6 +162,7 @@ def custom():
                 ),  # keep label alignment distinct between X & Y
                 "labelAngle": 270 if opts["verticalY"] else 0,
                 "ticks": True if opts["yTicks"] and opts["ticks"] else False,
+                "translate": 0,
             },
             "bar": {
                 "fill": opts["markFillColor"],
@@ -321,6 +320,7 @@ def custom():
             "scale": {
                 "bandPaddingInner": opts["bandPadding"],
                 "bandPaddingOuter": opts["bandPadding"],
+                "round": False,  # keeps band positions as floats so axis ticks align with mark centers
             },
             "rect": {
                 "fill": opts["markFillColor"],
