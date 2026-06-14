@@ -11,7 +11,7 @@ def mark_violin(
     y_col: str,
     categories: list[str],
     *,
-    boxplot_size: int = 8,
+    boxplot_size: int | None = None,  # defaults to theme markSize * 0.8
     boxplot_color: str = "black",
     palette: str | list[str] | None = None,
     fillOpacity: float | None = None,
@@ -155,9 +155,9 @@ def mark_violin(
         alt.Chart(df)
         .mark_boxplot(
             color=boxplot_color,
-            size=boxplot_size,
             ticks=False,
             rule={"stroke": boxplot_color},
+            **({"size": boxplot_size} if boxplot_size is not None else {}),
         )
         .encode(
             x=alt.X(f"{x_col}:N", sort=categories),
@@ -237,7 +237,6 @@ def mark_strip(
         point_size = alt.theme.options.get("markSize", 10)
     if point_opacity is None:
         point_opacity = alt.theme.options.get("markFillOpacity", 1.0)
-    cap_size = alt.theme.options.get("markSize", 10) * 0.75
 
     if scatter == "jitter":
         df = add_jitter_offsets(df, scale=jitter_scale)

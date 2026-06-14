@@ -16,10 +16,10 @@ def options(
     axisOffset=None,  # defaults to tickSize if not set, or 0 if closed is True
     axisWidth=0.50,
     bandPadding=0.1,
-    closed=None,   # None = auto (True if viewFill is set, else False); set explicitly to override
+    closed=None,  # None = auto (True if viewFill is set, else False); set explicitly to override
     chartFill=None,
-    chartHeight=150,
-    chartWidth=150,
+    chartHeight=100,
+    chartWidth=100,
     darkmode=False,
     dashedLine=False,
     dashedRule=True,
@@ -37,7 +37,7 @@ def options(
     markFillOpacity=1.0,
     markMedianFill="white",
     markMedianStroke="black",
-    markSize=10,
+    markSize=None,  # defaults to min(chartWidth, chartHeight) * 0.1 if not set (10 for a default 100x100 px^2 chart)
     markStroke="black",
     markStrokeOpacity=1,
     markStrokeWidth=0.50,
@@ -58,6 +58,8 @@ def options(
     """
     if closed is None:
         closed = viewFill is not None  # auto-close when a view fill color is specified
+    if markSize is None:
+        markSize = min(chartWidth, chartHeight) * 0.1
 
     alt.theme.options = {}  # must reset options to remove stale keys
     alt.theme.options["angledX"] = angledX
@@ -183,9 +185,10 @@ def custom():
                 "strokeWidth": opts["markStrokeWidth"],
             },
             "boxplot": {
+                "size": opts["markSize"] * 0.8,
                 "ticks": {
                     "fill": "white" if opts["darkmode"] else "black",
-                    "size": opts["markSize"] * 0.75,
+                    "size": opts["markSize"] * 0.6,
                     "thickness": opts["markStrokeWidth"],
                 },
                 "box": {
@@ -198,7 +201,7 @@ def custom():
                 "median": {
                     "fill": opts["markMedianFill"],
                     "fillOpacity": opts["markFillOpacity"],
-                    "size": opts["markSize"],
+                    "size": opts["markSize"] * 0.8,
                     "stroke": opts["markMedianStroke"],
                     "strokeOpacity": opts["markStrokeOpacity"],
                     "strokeWidth": opts["markStrokeWidth"],
@@ -236,7 +239,7 @@ def custom():
                 "ticks": {
                     "color": "white" if opts["darkmode"] else "black",
                     "opacity": 1,
-                    "size": opts["markSize"] * 0.75,
+                    "size": opts["markSize"] * 0.6,
                     "thickness": opts["markStrokeWidth"],
                 },
                 "thickness": opts["markStrokeWidth"],
@@ -260,8 +263,8 @@ def custom():
                 "offset": opts["legendOffset"]
                 if opts["legendOffset"] is not None
                 else opts["tickSize"],
-                "gradientLength": opts["chartHeight"] * 0.5,
-                "gradientThickness": opts["chartWidth"] * 0.05,
+                "gradientLength": opts["markSize"] * 5,
+                "gradientThickness": opts["markSize"] * 0.5,
                 "gradientOpacity": opts["markFillOpacity"],
                 "gradientStrokeColor": "white" if opts["darkmode"] else "black",
                 "gradientStrokeWidth": opts["markStrokeWidth"],
@@ -272,7 +275,7 @@ def custom():
                 "labelFontWeight": opts["fontWeight"],
                 "strokeColor": "white" if opts["darkmode"] else "black",
                 "strokeWidth": opts["axisWidth"] if opts["legendStroke"] else 0,
-                "symbolSize": opts["fontSize"] ** 2,
+                "symbolSize": opts["markSize"] * 5,
                 "symbolStrokeColor": "white" if opts["darkmode"] else "black",
                 "symbolStrokeWidth": opts["markStrokeWidth"]
                 if opts["markStrokeOpacity"] > 0
