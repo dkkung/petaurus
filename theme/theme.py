@@ -147,7 +147,9 @@ def custom():
                 "titleFontSize": opts["fontSize"],
                 "titleFontStyle": opts["fontStyle"],
                 "titleFontWeight": opts["fontWeight"],
-                "translate": 0 if opts["border"] else 0.5,  # translate=0 aligns the border stroke with the axis domain; trade-off is a ~0.5px offset between axis ticks and mark centers when border=True
+                "translate": 0
+                if opts["border"]
+                else 0.5,  # translate=0 aligns the border stroke with the axis domain; trade-off is a ~0.5px offset between axis ticks and mark centers when border=True
             },
             "axisX": {
                 "labelAlign": (
@@ -173,7 +175,7 @@ def custom():
             "boxplot": {
                 "ticks": {
                     "fill": "white" if opts["darkmode"] else "black",
-                    "size": opts["markSize"],
+                    "size": opts["markSize"] * 0.75,
                     "thickness": opts["markStrokeWidth"],
                 },
                 "box": {
@@ -362,7 +364,9 @@ def custom():
                     if opts["transparentBackground"] or opts["darkmode"]
                     else opts["viewBackgroundColor"]
                 ),
-                "stroke": ("white" if opts["darkmode"] else "black") if opts["border"] else None,
+                "stroke": ("white" if opts["darkmode"] else "black")
+                if opts["border"]
+                else None,
                 "strokeWidth": opts["axisWidth"],
             },
         },

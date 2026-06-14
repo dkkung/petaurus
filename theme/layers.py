@@ -2,6 +2,8 @@ import numpy as np
 import polars as pl
 import altair as alt
 
+from .transforms import add_jitter_offsets, add_beeswarm_offsets
+
 
 def mark_violin(
     df: pl.DataFrame,
@@ -11,10 +13,11 @@ def mark_violin(
     *,
     boxplot_size: int = 8,
     boxplot_color: str = "black",
-    violin_color: str | None = None,
+    palette: str | list[str] | None = None,
     fillOpacity: float | None = None,
     stroke: str | None = None,
     strokeWidth: float | None = None,
+    legend: bool = False,
     labelAngle: int = -45,
     steps: int = 200,
 ) -> alt.LayerChart:
@@ -39,7 +42,7 @@ def mark_violin(
         Width of the boxplot box in pixels.
     boxplot_color:
         Fill color of the boxplot.
-    violin_color:
+    palette:
         Fill color of all violins. When ``None``, each group inherits its
         color from the theme's active category palette.
     fillOpacity:
@@ -65,7 +68,7 @@ def mark_violin(
         chart = theme.mark_violin(
             df, "group", "value", CATEGORIES,
             boxplot_size=10,
-            violin_color="#AAAAAA",
+            palette="#AAAAAA",
             stroke="black",
             strokeWidth=0.5,
         )
@@ -118,10 +121,11 @@ def mark_violin(
             color=alt.Color(
                 "__group:N",
                 sort=categories,
-                legend=None,
+                title=x_col if legend else None,
+                legend=alt.Legend() if legend else None,
                 **(
-                    {"scale": alt.Scale(range=[violin_color])}
-                    if violin_color is not None
+                    {"scale": alt.Scale(range=palette if isinstance(palette, list) else [palette])}
+                    if palette is not None
                     else {}
                 ),
             ),
@@ -138,6 +142,156 @@ def mark_violin(
     )
 
     return alt.layer(violin, boxplot)
+
+
+def mark_strip(
+    df: pl.DataFrame,
+    x_col: str,
+    y_col: str,
+    categories: list[str],
+    *,
+    scatter: str = "jitter",
+    palette: list[str] | None = None,
+    point_size: int | None = None,
+    point_opacity: float | None = None,
+    jitter_scale: float = 4.0,
+    legend: bool = False,
+    errorbars: bool = True,
+    errorbar_extent: str = "sem",
+    labelAngle: int = -45,
+) -> alt.LayerChart:
+    """
+    Build an Altair layer combining jittered or beeswarm points with a median indicator.
+
+    Returns a ``LayerChart`` that can be saved directly or composed with other
+    layers (e.g. ``theme.pvalue_layer``).
+
+    Parameters
+    ----------
+    df:
+        Polars DataFrame containing the data.
+    x_col:
+        Column name for the grouping variable (x-axis).
+    y_col:
+        Column name for the value variable (y-axis).
+    categories:
+        Ordered list of all x-axis categories.
+    scatter:
+        Point distribution method: ``'jitter'`` (faster, random Gaussian offset)
+        or ``'beeswarm'`` (collision-avoidance, better for smaller n).
+    point_size:
+        Size of individual points. Inherits ``markSize`` from theme when ``None``.
+    point_opacity:
+        Opacity of individual points.
+    jitter_scale:
+        Standard deviation of jitter offsets in pixels. Only used when
+        ``scatter='jitter'``.
+    median_size:
+        Width of the median/mean indicator in pixels.
+    errorbars:
+        Whether to show error bars around the group mean. When ``True``,
+        the mean is shown as a tick with error bars. When ``False``, the
+        median is shown instead.
+    errorbar_extent:
+        Statistic to use for error bars: ``'sem'`` (standard error of the
+        mean, default) or ``'sd'`` (standard deviation).
+    labelAngle:
+        Angle of x-axis labels in degrees.
+
+    Examples
+    --------
+    ::
+
+        theme.options()
+        chart = theme.mark_strip(df, "group", "value", CATEGORIES)
+        theme.save(chart, "strip")
+
+        # beeswarm variant
+        chart = theme.mark_strip(df, "group", "value", CATEGORIES, scatter="beeswarm")
+    """
+    if point_size is None:
+        point_size = alt.theme.options.get("markSize", 10)
+    if point_opacity is None:
+        point_opacity = alt.theme.options.get("markFillOpacity", 1.0)
+    cap_size = alt.theme.options.get("markSize", 10) * 0.75
+
+    if scatter == "jitter":
+        df = add_jitter_offsets(df, scale=jitter_scale)
+        offset_col = "jitter_x"
+    elif scatter == "beeswarm":
+        df = add_beeswarm_offsets(df, y_col=y_col, group_by=[x_col])
+        offset_col = "beeswarm_x"
+    else:
+        raise ValueError(f"scatter must be 'jitter' or 'beeswarm', got {scatter!r}")
+
+    x_axis = alt.Axis(
+        labelAngle=labelAngle,
+        labelAlign="center" if labelAngle == 0 else "right",
+    )
+
+    x = alt.X(f"{x_col}:N", sort=categories, title=x_col, axis=x_axis)
+
+    points = (
+        alt.Chart(df)
+        .mark_circle(size=point_size, opacity=point_opacity)
+        .encode(
+            x=x,
+            y=alt.Y(f"{y_col}:Q", title=y_col),
+            xOffset=alt.XOffset(f"{offset_col}:Q"),
+            color=alt.Color(f"{x_col}:N", sort=categories,
+                            title=x_col if legend else None,
+                            legend=alt.Legend() if legend else None,
+                            **({"scale": alt.Scale(range=palette)} if palette is not None else {})),
+        )
+    )
+
+    median = (
+        alt.Chart(df)
+        .mark_boxplot(
+            ticks=False,
+            box={"fillOpacity": 0, "strokeOpacity": 0},
+            rule={"strokeOpacity": 0},
+            outliers={"opacity": 0},
+        )
+        .encode(
+            x=x,
+            y=alt.Y(f"{y_col}:Q", title=y_col),
+        )
+    )
+
+    if not errorbars:
+        return alt.layer(points, median)
+
+    if errorbar_extent == "sem":
+        error_expr = (pl.col(y_col).std() / pl.col(y_col).count().sqrt()).alias("__error")
+    elif errorbar_extent == "sd":
+        error_expr = pl.col(y_col).std().alias("__error")
+    else:
+        raise ValueError(f"errorbar_extent must be 'sem' or 'sd', got {errorbar_extent!r}")
+
+    summary = df.group_by(x_col).agg([pl.col(y_col).median().alias("__median"), error_expr])
+
+    stroke_width = alt.theme.options.get("markStrokeWidth", 0.5)
+    mark_size = alt.theme.options.get("markSize", 10)
+    stroke_color = "white" if alt.theme.options.get("darkmode", False) else "black"
+
+    errorbar_layer = (
+        alt.Chart(summary)
+        .mark_errorbar(
+            thickness=stroke_width,
+            color=stroke_color,
+            opacity=1,
+            rule={"strokeDash": [0, 0]},
+            ticks={"size": mark_size, "strokeWidth": stroke_width, "opacity": 1},
+        )
+        .encode(
+            x=x,
+            y=alt.Y("__median:Q", title=y_col),
+            yError=alt.YError("__error:Q"),
+        )
+    )
+
+    return alt.layer(points, errorbar_layer, median)
 
 
 def save(
