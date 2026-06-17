@@ -18,7 +18,7 @@ df = pl.DataFrame({"x": x, "y": y})
 # palette = theme.palette_range("RdPu_sat", reverse=False)
 palette = theme.palette_range("bluegrotto_oklab")
 
-theme.options(chartWidth=150)
+theme.options()
 
 chart = (
     alt.Chart(df)

@@ -31,7 +31,7 @@ df = pl.DataFrame(
 
 CATEGORIES = ["Control", "Drug A", "Drug B", "Drug C", "Drug D", "Drug E"]
 
-theme.options(chartHeight=125)
+theme.options()
 
 df = theme.add_beeswarm_offsets(
     df,

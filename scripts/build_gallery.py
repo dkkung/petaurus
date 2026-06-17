@@ -2,8 +2,7 @@
 Interactive HTML gallery of all custom palettes.
 
 Usage (from project root):
-    python -m theme.gallery
-    python theme/gallery.py
+    python scripts/build_gallery.py
 
 Output: gallery.html at the project root.
 """
@@ -15,8 +14,9 @@ import altair as alt
 import numpy as np
 import polars as pl
 
-from .palettes import colors
-from .transforms import add_beeswarm_offsets
+from theme.layers import mark_violin
+from theme.palettes import colors
+from theme.transforms import add_beeswarm_offsets
 
 W = 100  # base chart width / height (px)
 
@@ -59,10 +59,60 @@ def _mad_pct(steps):
 # ── Palette groups ──────────────────────────────────────────────────────────
 
 GROUPS = [
-    ("Sequential — Single-hue analogs", ["blues", "greens", "purples", "lavenders", "byzantiums", "greys", "reds", "rose", "oranges", "browns", "yellows", "cyans", "magentas"]),
+    (
+        "Sequential — Single-hue analogs",
+        [
+            "blues",
+            "greens",
+            "purples",
+            "lavenders",
+            "byzantiums",
+            "greys",
+            "reds",
+            "rose",
+            "oranges",
+            "browns",
+            "yellows",
+            "cyans",
+            "magentas",
+        ],
+    ),
     ("Sequential — Multi-hue analogs", ["ember", "dusk", "moss", "GnBu", "YlGnBu", "candy"]),
-    ("Sequential — Showcase multi-hue", ["lagoon", "bluestgrotto", "bluestgrotto2", "bluestgrotto3", "bluestgrotto4", "bluergrotto", "bluergrotto2", "bluergrotto3", "bluergrotto4", "bluegrotto", "bluegrotto2", "bluegrotto3", "bluegrotto4"]),
-    ("Diverging", ["RdBu", "RdBu_sat", "PuGn", "PuGn_sat", "BrTe", "BrTe_sat", "GdBu", "GdBu_sat", "MgGn", "MgGn_sat", "YlPu", "YlPu_sat"]),
+    (
+        "Sequential — Showcase multi-hue",
+        [
+            "lagoon",
+            "bluestgrotto",
+            "bluestgrotto2",
+            "bluestgrotto3",
+            "bluestgrotto4",
+            "bluergrotto",
+            "bluergrotto2",
+            "bluergrotto3",
+            "bluergrotto4",
+            "bluegrotto",
+            "bluegrotto2",
+            "bluegrotto3",
+            "bluegrotto4",
+        ],
+    ),
+    (
+        "Diverging",
+        [
+            "RdBu",
+            "RdBu_sat",
+            "PuGn",
+            "PuGn_sat",
+            "BrTe",
+            "BrTe_sat",
+            "GdBu",
+            "GdBu_sat",
+            "MgGn",
+            "MgGn_sat",
+            "YlPu",
+            "YlPu_sat",
+        ],
+    ),
 ]
 # Keys that are already final variants (no base+suffix convention)
 LITERAL_KEYS = []
@@ -71,53 +121,123 @@ VARIANTS = [("", "")]
 
 # ── Synthetic data ──────────────────────────────────────────────────────────
 
-_rng = np.random.default_rng(42)
-
-# Scatter: exponential curve with noise (200 pts)
+# Scatter: exact data from scatter.py
+_scatter_rng = np.random.default_rng(42)
 _sx = np.linspace(0, 5, 200)
-_sy = np.exp(_sx) + _rng.normal(0, 2, 200)
+_sy = np.exp(_sx) + _scatter_rng.normal(0, 2, 200)
 _smask = _sy >= 0
 _scatter_df = pl.DataFrame({"x": _sx[_smask].tolist(), "y": _sy[_smask].tolist()})
 
 # Heatmap: denser grid (500 pts) for fuller bin coverage
+_heat_rng = np.random.default_rng(42)
 _hx = np.linspace(0, 5, 500)
-_hy = np.exp(_hx) + _rng.normal(0, 2, 500)
+_hy = np.exp(_hx) + _heat_rng.normal(0, 2, 500)
 _hmask = _hy >= 0
 _heat_df = pl.DataFrame({"x": _hx[_hmask].tolist(), "y": _hy[_hmask].tolist()})
 
-# Area chart: 4 stacked proportions over time (mirrors examples/area_chart.py)
-_AREA_GROUPS = ["Type A", "Type B", "Type C", "Type D"]
+# Area chart: exact data from area_chart.py
+_AREA_GROUPS = ["Group A", "Group B", "Group C", "Group D"]
 _AREA_BASES = [0.4, 0.3, 0.2, 0.1]
+_area_rng = np.random.default_rng(42)
 _area_rows = []
 for _t in np.linspace(0, 24, 100):
     for _grp, _base in zip(_AREA_GROUPS, _AREA_BASES):
-        _area_rows.append({"time": float(_t), "group": _grp,
-                           "value": max(0.0, _base + _rng.normal(0, 0.02))})
+        _area_rows.append(
+            {"time": float(_t), "group": _grp,
+             "value": max(0.0, _base + _area_rng.normal(0, 0.02))}
+        )
 _area_df = pl.DataFrame(_area_rows)
 
-# Boxplot: normally distributed groups like boxplot.py, 200 pts per bin
-_CATEGORIES = ["0–1", "1–2", "2–3", "3–4", "4–5"]
+# Boxplot: 5 groups (dropped 6th), agnostic labels
+_BOX_CATS = ["Group A", "Group B", "Group C", "Group D", "Group E"]
+_box_rng = np.random.default_rng(42)
 _box_raw = pl.DataFrame(
     {
-        "bin": _CATEGORIES * 200,
+        "group": (["Group A"] * 200 + ["Group B"] * 200 + ["Group C"] * 200
+                  + ["Group D"] * 200 + ["Group E"] * 200),
         "value": np.concatenate(
             [
-                _rng.normal(1.0, 0.4, 200),
-                _rng.normal(3.5, 0.8, 200),
-                _rng.normal(8.0, 1.5, 200),
-                _rng.normal(18.0, 3.0, 200),
-                _rng.normal(38.0, 6.0, 200),
+                _box_rng.normal(10, 2, 200),
+                _box_rng.normal(14, 2, 200),
+                _box_rng.normal(11, 2, 200),
+                _box_rng.normal(13, 2, 200),
+                _box_rng.normal(9,  2, 200),
             ]
-        ).tolist(),
+        ),
     }
 )
-_N_BINS = len(_CATEGORIES)
-_BIN_LABELS = _CATEGORIES
-_box_df = add_beeswarm_offsets(_box_raw, y_col="value", group_by=["bin"], step=2)
+_box_df = add_beeswarm_offsets(_box_raw, y_col="value", group_by=["group"], step=10,
+                               height_px=W, markSize=5)
+
+# Line chart: 4 groups with slopes over 50 timepoints
+_LINE_GROUPS = ["Group A", "Group B", "Group C", "Group D"]
+_line_rng = np.random.default_rng(42)
+_line_slopes = {"Group A": 0.0, "Group B": 0.25, "Group C": 0.15, "Group D": -0.1}
+_line_rows = []
+for _grp in _LINE_GROUPS:
+    for _t in np.linspace(0, 24, 50):
+        _line_rows.append({"group": _grp, "time": float(_t),
+                           "value": float(10 + _line_slopes[_grp] * _t + _line_rng.normal(0, 0.3))})
+_line_df = pl.DataFrame(_line_rows)
+
+# Strip chart: 5 groups, 50 pts each
+_STRIP_CATS = ["Group A", "Group B", "Group C", "Group D", "Group E"]
+_strip_rng = np.random.default_rng(42)
+_strip_df = pl.DataFrame({
+    "group": (["Group A"] * 50 + ["Group B"] * 50 + ["Group C"] * 50
+              + ["Group D"] * 50 + ["Group E"] * 50),
+    "value": np.concatenate([
+        _strip_rng.normal(10, 2, 50), _strip_rng.normal(14, 2, 50),
+        _strip_rng.normal(11, 2, 50), _strip_rng.normal(13, 2, 50),
+        _strip_rng.normal(9,  2, 50),
+    ]).tolist(),
+})
+
+# Stacked bar: 5 groups, 2 types
+_SBAR_GROUPS = ["Group A", "Group B", "Group C", "Group D", "Group E"]
+_SBAR_TYPES = ["Type 1", "Type 2"]
+_sbar_rng = np.random.default_rng(42)
+_sbar_df = pl.DataFrame({
+    "group": ["Group A", "Group B", "Group C", "Group D", "Group E"] * 2,
+    "type": ["Type 1"] * 5 + ["Type 2"] * 5,
+    "value": _sbar_rng.integers(20, 80, 10).tolist(),
+})
+
+# Violin: 5 groups (dropped 6th), 200 pts each
+_VIOLIN_CATS = ["Group A", "Group B", "Group C", "Group D", "Group E"]
+_violin_rng = np.random.default_rng(42)
+_violin_df = pl.DataFrame({
+    "group": (["Group A"] * 200 + ["Group B"] * 200 + ["Group C"] * 200
+              + ["Group D"] * 200 + ["Group E"] * 200),
+    "value": np.concatenate([
+        _violin_rng.normal(10, 2, 200), _violin_rng.normal(14, 2, 200),
+        _violin_rng.normal(11, 2, 200), _violin_rng.normal(13, 2, 200),
+        _violin_rng.normal(9,  2, 200),
+    ]).tolist(),
+})
+
+# Histogram: 3 groups, 150 pts each
+_HIST_GROUPS = ["Group A", "Group B", "Group C"]
+_hist_rng = np.random.default_rng(42)
+_hist_df = pl.DataFrame({
+    "group": ["Group A"] * 150 + ["Group B"] * 150 + ["Group C"] * 150,
+    "value": np.concatenate([
+        _hist_rng.normal(10, 2,   150),
+        _hist_rng.normal(13, 1.5, 150),
+        _hist_rng.normal(7,  3,   150),
+    ]).tolist(),
+})
 
 # Pre-compute viridis reference steps
 _VIR_STEPS = _de_steps("mpl_viridis")
 _VIR_MAD = _mad_pct(_VIR_STEPS)
+
+# ── Layout constants ────────────────────────────────────────────────────────
+
+_N_ROW_CHARTS = 11   # colorspace, de_sparkline, area, scatter, line, boxplot,
+                     # strip, violin, stacked_bar, histogram, heatmap
+_ROW_SPACING = 6
+_SWATCH_W = _N_ROW_CHARTS * W + (_N_ROW_CHARTS - 1) * _ROW_SPACING  # 1160px
 
 # ── Chart builders ──────────────────────────────────────────────────────────
 
@@ -125,15 +245,9 @@ _VIR_MAD = _mad_pct(_VIR_STEPS)
 def _swatch(key, label):
     p = colors[key]
     n = len(p)
-    df = pl.DataFrame(
-        {
-            "x1": list(range(n)),
-            "x2": list(range(1, n + 1)),
-            "c": p,
-        }
-    )
+    df = pl.DataFrame({"x1": list(range(n)), "x2": list(range(1, n + 1)), "c": p})
     return (
-        alt.Chart(df, title=alt.TitleParams(label, fontSize=11, fontWeight="normal"))
+        alt.Chart(df, title=label)
         .mark_rect(strokeWidth=0)
         .encode(
             x=alt.X("x1:Q", axis=None, scale=alt.Scale(domain=[0, n], nice=False)),
@@ -141,7 +255,7 @@ def _swatch(key, label):
             color=alt.Color("c:N", scale=None, legend=None),
             tooltip=alt.Tooltip("c:N", title="hex"),
         )
-        .properties(width=W, height=14)
+        .properties(height=_SWATCH_H)
     )
 
 
@@ -149,101 +263,144 @@ def _scatter(key):
     p = colors[key]
     return (
         alt.Chart(_scatter_df)
-        .mark_point(size=18, opacity=0.85, stroke="black")
+        .mark_point()
         .encode(
-            x=alt.X("x:Q", title=None, axis=alt.Axis(tickCount=4, labelFontSize=8, grid=False)),
-            y=alt.Y("y:Q", title=None, axis=alt.Axis(tickCount=4, labelFontSize=8, grid=False)),
-            color=alt.Color("y:Q", scale=alt.Scale(range=p), legend=None),
-            tooltip=[
-                alt.Tooltip("x:Q", format=".2f"),
-                alt.Tooltip("y:Q", format=".1f"),
-            ],
+            x=alt.X("x:Q", title=None),
+            y=alt.Y("y:Q", title=None),
+            color=alt.Color("y:Q", title=None, scale=alt.Scale(range=p), legend=None),
         )
-        .properties(width=W, height=W)
     )
 
 
 def _boxplot(key):
     p = colors[key]
     n = len(p)
-    # Map each of the N bins to a colour from the palette
-    bin_colors = [p[round(i * (n - 1) / (_N_BINS - 1))] for i in range(_N_BINS)]
+    box_colors = [p[round(i * (n - 1) / (len(_BOX_CATS) - 1))] for i in range(len(_BOX_CATS))]
     x_enc = alt.X(
-        "bin:N", sort=_BIN_LABELS, title=None, axis=alt.Axis(labels=False, ticks=False, grid=False)
+        "group:N", sort=_BOX_CATS, title=None,
+        axis=alt.Axis(labelAngle=-45, labelAlign="right"),
     )
-    y_enc = alt.Y("value:Q", title=None, axis=alt.Axis(tickCount=4, labelFontSize=8, grid=False))
+    y_enc = alt.Y("value:Q", title=None)
     color_enc = alt.Color(
-        "bin:N",
-        sort=_BIN_LABELS,
-        legend=None,
-        scale=alt.Scale(domain=_BIN_LABELS, range=bin_colors),
+        "group:N", sort=_BOX_CATS, legend=None,
+        scale=alt.Scale(domain=_BOX_CATS, range=box_colors),
     )
-
-    boxes = alt.Chart(_box_df).mark_boxplot(size=14).encode(x=x_enc, y=y_enc, color=color_enc)
+    boxes = alt.Chart(_box_df).mark_boxplot().encode(x=x_enc, y=y_enc, color=color_enc)
     pts = (
         alt.Chart(_box_df)
-        .mark_circle(size=5)
-        .encode(
-            x=x_enc,
-            xOffset=alt.XOffset("beeswarm_x:Q"),
-            y=y_enc,
-            color=color_enc,
-        )
+        .mark_circle(clip=True)
+        .encode(x=x_enc, xOffset=alt.XOffset("beeswarm_x:Q"), y=y_enc)
     )
-    return (pts + boxes).properties(width=W, height=W).resolve_scale(color="independent")
+    return (pts + boxes).resolve_scale(color="independent")
 
 
 def _heatmap(key):
     p = colors[key]
     return (
         alt.Chart(_heat_df)
-        .mark_rect(stroke="white")
+        .mark_rect()
         .encode(
-            x=alt.X(
-                "x:Q",
-                bin=alt.Bin(maxbins=12),
-                title=None,
-                axis=alt.Axis(tickCount=4, labelFontSize=8, grid=False),
-            ),
-            y=alt.Y(
-                "y:Q",
-                bin=alt.Bin(maxbins=12),
-                title=None,
-                axis=alt.Axis(tickCount=4, labelFontSize=8, grid=False),
-            ),
+            x=alt.X("x:Q", bin=alt.Bin(maxbins=12), title=None),
+            y=alt.Y("y:Q", bin=alt.Bin(maxbins=12), title=None),
             color=alt.Color("count()", scale=alt.Scale(range=p), legend=None),
             tooltip=alt.Tooltip("count()", title="count"),
         )
-        .properties(width=W, height=W)
     )
 
 
 def _area(key):
     p = colors[key]
     n = len(p)
-    # Pick 4 evenly-spaced stops from the palette
     palette = [p[round(i * (n - 1) / (len(_AREA_GROUPS) - 1))] for i in range(len(_AREA_GROUPS))]
     return (
         alt.Chart(_area_df)
         .mark_area()
         .encode(
-            x=alt.X("time:Q", title=None, axis=alt.Axis(tickCount=4, labelFontSize=8, grid=False)),
-            y=alt.Y(
-                "value:Q",
-                title=None,
-                stack="normalize",
-                scale=alt.Scale(domain=[0, 1]),
-                axis=alt.Axis(tickCount=3, labelFontSize=8, grid=False),
-            ),
-            color=alt.Color(
-                "group:N",
-                sort=_AREA_GROUPS,
-                scale=alt.Scale(range=palette),
-                legend=None,
-            ),
+            x=alt.X("time:Q", title=None),
+            y=alt.Y("value:Q", title=None, stack="normalize", scale=alt.Scale(domain=[0, 1])),
+            color=alt.Color("group:N", sort=_AREA_GROUPS, scale=alt.Scale(range=palette),
+                            legend=None),
             order=alt.Order("group:N", sort="descending"),
         )
-        .properties(width=W, height=W)
+    )
+
+
+def _line(key):
+    p = colors[key]
+    n = len(p)
+    palette = [p[round(i * (n - 1) / (len(_LINE_GROUPS) - 1))] for i in range(len(_LINE_GROUPS))]
+    return (
+        alt.Chart(_line_df)
+        .mark_line()
+        .encode(
+            x=alt.X("time:Q", title=None),
+            y=alt.Y("value:Q", title=None),
+            color=alt.Color("group:N", sort=_LINE_GROUPS, scale=alt.Scale(range=palette),
+                            legend=None),
+        )
+    )
+
+
+_strip_df_b = add_beeswarm_offsets(_strip_df, y_col="value", group_by=["group"],
+                                   step=5, height_px=W, markSize=8)
+
+
+def _strip(key):
+    p = colors[key]
+    n = len(p)
+    palette = [p[round(i * (n - 1) / (len(_STRIP_CATS) - 1))] for i in range(len(_STRIP_CATS))]
+    return (
+        alt.Chart(_strip_df_b)
+        .mark_circle(clip=True)
+        .encode(
+            x=alt.X("group:N", sort=_STRIP_CATS, title=None,
+                    axis=alt.Axis(labelAngle=-45, labelAlign="right")),
+            xOffset=alt.XOffset("beeswarm_x:Q"),
+            y=alt.Y("value:Q", title=None),
+            color=alt.Color("group:N", sort=_STRIP_CATS, scale=alt.Scale(range=palette),
+                            legend=None),
+        )
+    )
+
+
+def _violin(key):
+    p = colors[key]
+    n = len(p)
+    palette = [p[round(i * (n - 1) / (len(_VIOLIN_CATS) - 1))] for i in range(len(_VIOLIN_CATS))]
+    return mark_violin(_violin_df, "group", "value", _VIOLIN_CATS, palette=palette, legend=False,
+                       labelAngle=-45)
+
+
+def _stacked_bar(key):
+    p = colors[key]
+    n = len(p)
+    palette = [p[0], p[n - 1]]
+    return (
+        alt.Chart(_sbar_df)
+        .mark_bar()
+        .encode(
+            x=alt.X("group:N", sort=_SBAR_GROUPS, title=None,
+                    axis=alt.Axis(labelAngle=-45, labelAlign="right")),
+            y=alt.Y("value:Q", title=None, stack="normalize", scale=alt.Scale(domain=[0, 1])),
+            color=alt.Color("type:N", sort=_SBAR_TYPES, scale=alt.Scale(range=palette),
+                            legend=None),
+        )
+    )
+
+
+def _histogram(key):
+    p = colors[key]
+    n = len(p)
+    palette = [p[round(i * (n - 1) / (len(_HIST_GROUPS) - 1))] for i in range(len(_HIST_GROUPS))]
+    return (
+        alt.Chart(_hist_df)
+        .mark_bar(binSpacing=0)
+        .encode(
+            x=alt.X("value:Q", title=None, bin=alt.Bin(maxbins=20)),
+            y=alt.Y("count()", title=None),
+            color=alt.Color("group:N", sort=_HIST_GROUPS, scale=alt.Scale(range=palette),
+                            legend=None),
+        )
     )
 
 
@@ -260,45 +417,31 @@ def _de_sparkline(key):
     all_de = [r["dE"] for r in pal_rows + vir_rows]
     lo, hi = min(all_de) * 0.82, max(all_de) * 1.18
 
-    y_enc = alt.Y(
-        "dE:Q",
-        title=None,
-        scale=alt.Scale(domain=[lo, hi]),
-        axis=alt.Axis(tickCount=3, labelFontSize=8),
-    )
+    max_step = max(len(steps) - 1, len(_VIR_STEPS) - 1)
     x_enc = alt.X(
-        "step:Q", title=None, axis=alt.Axis(tickMinStep=1, labels=False, ticks=False, domain=False)
+        "step:Q", title="Step",
+        scale=alt.Scale(domain=[-0.5, max_step + 0.5]),
+        axis=alt.Axis(tickMinStep=1),
     )
+    y_enc = alt.Y("dE:Q", title="Oklab ΔE", scale=alt.Scale(domain=[lo, hi]))
 
-    # Viridis: solid line + points
     vir_line = (
         alt.Chart(vir_df)
-        .mark_line(
-            point=alt.OverlayMarkDef(size=25, color="#AAAAAA"),
-            strokeWidth=1.5,
-            color="#AAAAAA",
-            opacity=0.85,
-        )
+        .mark_line(point=True, color="#AAAAAA")
         .encode(
-            x=x_enc,
-            y=y_enc,
+            x=x_enc, y=y_enc,
             tooltip=[alt.Tooltip("step:Q"), alt.Tooltip("dE:Q", format=".4f", title="viridis ΔE")],
         )
     )
-    # Palette: line + points
     pal_line = (
         alt.Chart(pal_df)
-        .mark_line(point=alt.OverlayMarkDef(size=30), strokeWidth=1.5, color=mid_hex)
+        .mark_line(point=True, color=mid_hex)
         .encode(
-            x=x_enc,
-            y=y_enc,
+            x=x_enc, y=y_enc,
             tooltip=[alt.Tooltip("step:Q"), alt.Tooltip("dE:Q", format=".4f", title="ΔE")],
         )
     )
-
-    return (vir_line + pal_line).properties(
-        width=W, height=55, title=alt.TitleParams(f"MAD {mad}%", fontSize=10)
-    )
+    return (vir_line + pal_line).properties(title=f"MAD {mad}%")
 
 
 def _colorspace(key):
@@ -306,14 +449,8 @@ def _colorspace(key):
     hexes = colors[key]
     labs = [_hex_to_oklab(h) for h in hexes]
     rows = [
-        {
-            "hex": h,
-            "a": round(a, 4),
-            "b": round(b, 4),
-            "L": round(L, 3),
-            "i": i,
-            "label": f"#{i} {h}",
-        }
+        {"hex": h, "a": round(a, 4), "b": round(b, 4), "L": round(L, 3),
+         "i": i, "label": f"#{i} {h}"}
         for i, (h, (L, a, b)) in enumerate(zip(hexes, labs))
     ]
     df = pl.DataFrame(rows)
@@ -321,27 +458,16 @@ def _colorspace(key):
 
     line = (
         alt.Chart(df)
-        .mark_line(color="#dddddd", strokeWidth=1, opacity=0.7)
+        .mark_line(color="black")
         .encode(x="a:Q", y="b:Q", order="i:O")
     )
     pts = (
         alt.Chart(df)
-        .mark_circle(size=70, strokeWidth=1, stroke="white")
+        .mark_circle(size=70)
         .encode(
-            x=alt.X(
-                "a:Q",
-                scale=alt.Scale(padding=12),
-                axis=alt.Axis(title="a", labelFontSize=8, tickCount=3),
-            ),
-            y=alt.Y(
-                "b:Q",
-                scale=alt.Scale(padding=12),
-                axis=alt.Axis(title="b", labelFontSize=8, tickCount=3),
-            ),
+            x=alt.X("a:Q", scale=alt.Scale(padding=12), axis=alt.Axis(title="a")),
+            y=alt.Y("b:Q", scale=alt.Scale(padding=12), axis=alt.Axis(title="b")),
             color=alt.Color("hex:N", scale=alt.Scale(domain=domain, range=domain), legend=None),
-            opacity=alt.Opacity(
-                "L:Q", scale=alt.Scale(domain=[0.05, 1.0], range=[0.45, 1.0]), legend=None
-            ),
             tooltip=[
                 alt.Tooltip("label:N", title="stop"),
                 alt.Tooltip("L:Q", format=".2f"),
@@ -352,29 +478,40 @@ def _colorspace(key):
     )
     return (
         (line + pts)
-        .properties(width=W, height=W, title=alt.TitleParams("Oklab a/b", fontSize=10))
-        .resolve_scale(color="independent", opacity="independent")
+        .properties(title="Oklab a/b")
+        .resolve_scale(color="independent")
     )
 
 
 # ── Row: all charts for one palette key (landscape layout) ─────────────────
 
 
+_SWATCH_H = 14
+
+
 def _row(key, label):
-    swatch = _swatch(key, label)
-    # Swatch spans full row width — stretch it to match the hconcat width
-    return alt.vconcat(
-        swatch,
-        alt.hconcat(
-            _scatter(key),
-            _boxplot(key),
-            _heatmap(key),
-            _area(key),
-            _de_sparkline(key),
-            _colorspace(key),
-            spacing=6,
-        ).resolve_scale(color="independent", opacity="independent"),
+    # Swatch sits above the colorspace as a vconcat; all other charts sit
+    # at the same level via hconcat — no spacers needed since charts without
+    # angled x-labels and charts with them will be aligned by Vega-Lite's
+    # hconcat top-alignment.
+    first = alt.vconcat(
+        _swatch(key, label),
+        _colorspace(key),
         spacing=2,
+    ).resolve_scale(color="independent")
+    return alt.hconcat(
+        first,
+        _de_sparkline(key),
+        _area(key),
+        _scatter(key),
+        _line(key),
+        _boxplot(key),
+        _strip(key),
+        _violin(key),
+        _stacked_bar(key),
+        _histogram(key),
+        _heatmap(key),
+        spacing=6,
     ).resolve_scale(color="independent", opacity="independent")
 
 
@@ -415,57 +552,15 @@ def _build_gallery():
     )
 
 
-# ── Vega library inlining (so the HTML is self-contained, no CDN required) ───
-
-_VEGA_URLS = [
-    "https://cdn.jsdelivr.net/npm/vega@6",
-    "https://cdn.jsdelivr.net/npm/vega-lite@6.4.1",
-    "https://cdn.jsdelivr.net/npm/vega-embed@7",
-]
-_CACHE_DIR = Path(__file__).parent / ".vega_cache"
-
-
-def _fetch_script(url: str) -> str:
-    """Fetch a JS library (with on-disk cache so we don't re-download)."""
-    import urllib.request, hashlib
-    _CACHE_DIR.mkdir(exist_ok=True)
-    cache_file = _CACHE_DIR / hashlib.md5(url.encode()).hexdigest()
-    if cache_file.exists():
-        return cache_file.read_text(encoding="utf-8")
-    with urllib.request.urlopen(url) as resp:
-        body = resp.read().decode("utf-8")
-    cache_file.write_text(body, encoding="utf-8")
-    return body
-
-
-def _inline_vega_scripts(html_path: Path) -> None:
-    """Replace CDN <script src=…> tags with inline <script>…</script> blocks."""
-    html = html_path.read_text(encoding="utf-8")
-    for url in _VEGA_URLS:
-        js = _fetch_script(url)
-        # Tag form produced by Altair is: <script type="text/javascript" src="URL"></script>
-        tag = f'<script type="text/javascript" src="{url}"></script>'
-        inline = f'<script type="text/javascript">{js}</script>'
-        if tag not in html:
-            print(f"  warning: expected script tag not found: {url}")
-            continue
-        html = html.replace(tag, inline)
-    html_path.write_text(html, encoding="utf-8")
-
-
 # ── Entry point ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     import theme as _theme
 
-    _theme.options(chartWidth=W, chartHeight=W)
+    _theme.options(chartWidth=W, chartHeight=W, axisWidth=0.25)
 
     gallery = _build_gallery()
 
-    out = Path(__file__).parent.parent / "gallery.html"
+    out = Path(__file__).parent.parent / "gallery" / "gallery.html"
     gallery.save(str(out))
     print(f"saved {out}")
-
-    _inline_vega_scripts(out)
-    size_mb = out.stat().st_size / 1024 / 1024
-    print(f"inlined vega libraries → file is now {size_mb:.1f} MB (self-contained)")
