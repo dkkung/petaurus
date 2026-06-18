@@ -115,6 +115,14 @@ GROUPS = [
         ],
     ),
     (
+        "Discrete",
+        [
+            "nucleotide",
+            "proteins",
+            "proteins2",
+        ],
+    ),
+    (
         "Diverging — Sequential pairs",
         [
             "greensblues",
