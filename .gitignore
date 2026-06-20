@@ -53,3 +53,4 @@ pipenv
 # Project-specific #
 *.png
 *.svg
+!assets/thumbnail_light.png
