@@ -4,16 +4,16 @@ An Altair configuration wrapper with perceptually uniform palettes and chart uti
 
 *This is a personal project under active development, so there may be breaking changes between minor versions.*
 
-![thumbnail](docs/thumbnail_light.png)
+![thumbnail](https://raw.githubusercontent.com/dkkung/petaurus/main/docs/thumbnail_light.png)
 
 ## Installation
 
 ```sh
 # uv
-uv pip install git+https://github.com/dkkung/altair_custom_themes.git
+uv pip install petaurus
 
 # pip
-pip install git+https://github.com/dkkung/altair_custom_themes.git
+pip install petaurus
 ```
 
 Requires Python 3.11+. Dependencies: `altair`, `numpy`, `polars`, `scipy`.
