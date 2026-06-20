@@ -1,6 +1,6 @@
 [project]
 name = "petaurus"
-version = "0.3.0"
+version = "0.3.1"
 description = "Custom Altair/Vega-Lite themes, perceptually uniform palettes, and chart utilities for publication-ready scientific figures."
 readme = "README.md"
 license = { file = "LICENSE" }
