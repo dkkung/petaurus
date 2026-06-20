@@ -1,6 +1,6 @@
 # petaurus
 
-An Altair configuration wrapper with perceptually uniform palettes and chart utilities for publication-ready scientific figures.
+An Altair configuration wrapper with perceptually uniform palettes and chart utilities for publication-ready figures.
 
 *This is a personal project under active development, so there may be breaking changes between minor versions.*
 
