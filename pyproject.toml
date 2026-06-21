@@ -1,5 +1,5 @@
 [project]
-name = "arcturus"
+name = "dysonsphere"
 version = "0.4.0"
 description = "An Altair configuration wrapper with perceptually uniform palettes and chart utilities for publication-ready figures."
 readme = "README.md"
@@ -29,14 +29,14 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/dkkung/arcturus"
+Repository = "https://github.com/dkkung/dysonsphere"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["arcturus"]
+packages = ["dysonsphere"]
 
 [tool.ruff]
 line-length = 100

@@ -15,10 +15,10 @@ import altair as alt
 import numpy as np
 import polars as pl
 
-import arcturus as theme
+import dysonsphere as theme
 import scripts.build.build_gallery as _bg
-from arcturus.layers import mark_violin
-from arcturus.palettes import colors
+from dysonsphere.layers import mark_violin
+from dysonsphere.palettes import colors
 
 KEY = "blues2"
 

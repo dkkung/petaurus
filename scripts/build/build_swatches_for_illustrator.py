@@ -9,7 +9,7 @@ Usage:
 import json
 import pathlib
 
-from arcturus.palettes import colors
+from dysonsphere.palettes import colors
 
 
 def main():

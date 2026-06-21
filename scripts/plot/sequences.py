@@ -9,8 +9,8 @@ H (histidine) grouped with polar (imidazole side chain; H-bond donor/acceptor).
 import altair as alt
 import polars as pl
 
-import arcturus as theme
-from arcturus.palettes import colors
+import dysonsphere as theme
+from dysonsphere.palettes import colors
 
 # ── Protein sequence ──────────────────────────────────────────────────────────
 

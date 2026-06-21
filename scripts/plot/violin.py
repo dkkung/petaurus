@@ -1,7 +1,7 @@
 import numpy as np
 import polars as pl
 
-import arcturus as theme
+import dysonsphere as theme
 
 rng = np.random.default_rng(42)
 

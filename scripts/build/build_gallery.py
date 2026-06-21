@@ -14,8 +14,8 @@ import altair as alt
 import numpy as np
 import polars as pl
 
-from arcturus.layers import mark_violin
-from arcturus.palettes import colors
+from dysonsphere.layers import mark_violin
+from dysonsphere.palettes import colors
 
 W = 100  # base chart width / height (px)
 
@@ -665,7 +665,7 @@ def _build_gallery():
 # ── Entry point ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    import arcturus as _theme
+    import dysonsphere as _theme
 
     _theme.options(chartWidth=W, chartHeight=W)
 
