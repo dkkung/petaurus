@@ -268,7 +268,7 @@ def custom():
                 "labelFontWeight": opts["fontWeight"],
                 "strokeColor": "white" if opts["darkmode"] else "black",
                 "strokeWidth": opts["axisWidth"] if opts["legendStroke"] else 0,
-                "symbolSize": opts["markSize"] * 5,
+                "symbolSize": opts["fontSize"] * 6,
                 "symbolStrokeColor": "white" if opts["darkmode"] else "black",
                 "symbolStrokeWidth": opts["markStrokeWidth"]
                 if opts["markStrokeOpacity"] > 0
