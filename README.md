@@ -198,6 +198,120 @@ theme.save(chart, "myplot", description="Figure 1")  # embed a description in th
 
 ---
 
+## Data transforms
+
+### dysonsphere.add_jitter()
+
+Adds random Gaussian x-offsets to each row. Each offset is drawn independently from N(0, spread²) — ~68% of points fall within ±spread of centre, ~95% within ±2·spread. Points can overlap; use `add_beeswarm()` for small n where overlap is undesirable.
+
+```python
+df = theme.add_jitter(df, spread=5)
+
+alt.Chart(df).mark_circle().encode(
+    x=alt.X("group:N"),
+    y=alt.Y("value:Q"),
+    xOffset=alt.XOffset("jitter_x:Q"),
+)
+```
+
+| Parameter | Default | Description |
+|---|---|---|
+| `spread` | `2.0` | Standard deviation of jitter in pixels |
+| `out_col` | `"jitter_x"` | Output column name |
+| `seed` | `20220701` | Random seed |
+
+### dysonsphere.add_beeswarm()
+
+Computes collision-avoiding x-offsets per group. Points are sorted by y position and placed at the nearest x that doesn't overlap any already-placed point (tried in order: 0, ±step, ±2·step, …). Better than jitter for small n, but slower. Total width grows with n.
+
+```python
+df = theme.add_beeswarm(df, y_col="value", group_by=["group"], spread=2.0)
+
+alt.Chart(df).mark_circle().encode(
+    x=alt.X("group:N"),
+    y=alt.Y("value:Q"),
+    xOffset=alt.XOffset("beeswarm_x:Q"),
+)
+```
+
+| Parameter | Default | Description |
+|---|---|---|
+| `y_col` | required | Value column |
+| `group_by` | required | Column(s) defining each beeswarm group |
+| `spread` | `2.0` | Collision radius in pixels — points placed so no two centres are closer than 2·spread |
+| `height_px` | theme `chartHeight` | Chart height in pixels |
+| `out_col` | `"beeswarm_x"` | Output column name |
+
+---
+
+## Statistical annotations
+
+`pvalue_layer()` adds a single p-value bracket between two groups; `pvalue_layers()` annotates multiple comparisons at once, stacking brackets automatically so they don't overlap. Combine with any chart using `+`.
+
+```python
+CATEGORIES = ["Control", "Drug A", "Drug B"]
+
+# single comparison
+chart + theme.pvalue_layer(
+    df, "group", "value", "Control", "Drug A",
+    categories=CATEGORIES, chartWidth=300,
+)
+
+# multiple comparisons — brackets stacked automatically
+chart + theme.pvalue_layers(
+    df, "group", "value",
+    pairs=[("Control", "Drug A"), ("Control", "Drug B"), ("Drug A", "Drug B")],
+    categories=CATEGORIES, chartWidth=300,
+)
+```
+
+From pre-computed p-values:
+
+```python
+# single
+theme.pvalue_layer(..., pvalue=0.023, y=210)
+
+# batch
+theme.pvalue_layers(..., pvalues=[0.002, 0.031])
+```
+
+**Shared parameters**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `df` | required | Polars DataFrame |
+| `x_col`, `y_col` | required | Column names for groups and values |
+| `test` | `"mannwhitneyu"` | Statistical test: `"mannwhitneyu"`, `"ttest_ind"`, `"ttest_rel"`, `"wilcoxon"`, `"tukey_hsd"` |
+| `correction` | `None` | `"bonferroni"` or `None`. Ignored for `tukey_hsd` |
+| `n_comparisons` | `1` / `len(pairs)` | Number of comparisons for Bonferroni correction |
+| `y_pad` | `5` | Padding above data max when y is auto-placed |
+| `style` | `"line"` | `"line"` (bar only) or `"bracket"` (bar + end ticks) |
+| `categories` | inferred | Ordered list of all x-axis categories |
+| `chartWidth` | theme default | Chart width used to compute text x position |
+| `decimals` | `3` | Decimal places in the p-value label |
+
+**`pvalue_layer()` only**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `group1`, `group2` | required | Group labels to compare |
+| `pvalue` | `None` | Pre-computed p-value (skips the test) |
+| `y` | auto | Y position of the bracket in data units |
+| `reverse` | `False` | Flip the annotation below the bar |
+
+**`pvalue_layers()` only**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `pairs` | required | List of `(group1, group2)` tuples to annotate |
+| `pvalues` | `None` | Pre-computed p-values, one per pair (skips all tests) |
+| `y_positions` | `None` | Explicit y positions per bracket (overrides auto-stacking) |
+| `y_start` | auto | Y position of the lowest bracket |
+| `y_step` | `y_pad × 2` | Vertical distance between stacking levels |
+| `tick_height` | `0.5` | End tick height in data units (only for `style="bracket"`) |
+
+---
+
 ## Custom marks
 
 ### dysonsphere.mark_violin()
@@ -242,100 +356,9 @@ chart = theme.mark_strip(df, "group", "value", CATEGORIES, scatter="beeswarm")
 | `scatter` | `"jitter"` | `"jitter"` (fast, random Gaussian) or `"beeswarm"` (collision-avoidance) |
 | `palette` | `None` | List of colors for points |
 | `point_size` | theme `markSize` | Point size in sq px |
-| `jitter_scale` | `4.0` | Jitter standard deviation in pixels |
+| `spread` | `2.0` | Point spread in pixels (std dev for jitter, collision radius for beeswarm) |
 | `errorbars` | `True` | Show mean ± error bars |
 | `errorbar_extent` | `"sem"` | `"sem"` or `"sd"` |
-
----
-
-## Statistical annotations
-
-Add a p-value bracket between two groups using `dysonsphere.pvalue_layer()`. Combine with any chart using `+`.
-
-```python
-ann = theme.pvalue_layer(
-    df, "group", "value", "Control", "Drug A",
-    test="mannwhitneyu",
-    categories=["Control", "Drug A", "Drug B"],
-    chartWidth=300,
-    y=210,
-)
-chart + ann
-```
-
-From a pre-computed p-value:
-
-```python
-ann = theme.pvalue_layer(
-    group1="Control", group2="Drug A",
-    pvalue=0.023, y=210,
-    categories=CATEGORIES,
-    chartWidth=300,
-)
-```
-
-| Parameter | Default | Description |
-|---|---|---|
-| `df` | `None` | Polars DataFrame (required unless `pvalue` and `y` are both provided) |
-| `x_col`, `y_col` | `None` | Column names for groups and values |
-| `group1`, `group2` | required | Group labels to compare |
-| `test` | `"mannwhitneyu"` | Statistical test: `"mannwhitneyu"`, `"ttest_ind"`, `"ttest_rel"`, `"wilcoxon"`, `"tukey_hsd"` |
-| `pvalue` | `None` | Pre-computed p-value (skips the test) |
-| `correction` | `None` | `"bonferroni"` or `None` |
-| `n_comparisons` | `1` | Number of comparisons for Bonferroni correction |
-| `y` | auto | Y position of the bracket in data units |
-| `y_pad` | `5` | Padding above the group max when `y` is auto-placed |
-| `style` | `"line"` | `"line"` (bar only) or `"bracket"` (bar + end ticks) |
-| `categories` | inferred | Ordered list of all x-axis categories |
-| `chartWidth` | theme default | Chart width used to compute text x position |
-| `reverse` | `False` | Flip the annotation below the bar |
-| `decimals` | `3` | Decimal places in the p-value label |
-
----
-
-## Data transforms
-
-### Jitter
-
-Adds random Gaussian x-offsets to each row, useful for strip plots.
-
-```python
-df = theme.add_jitter_offsets(df, scale=5)
-
-alt.Chart(df).mark_circle().encode(
-    x=alt.X("group:N"),
-    y=alt.Y("value:Q"),
-    xOffset=alt.XOffset("jitter_x:Q"),
-)
-```
-
-| Parameter | Default | Description |
-|---|---|---|
-| `scale` | `5.0` | Standard deviation of jitter in pixels |
-| `out_col` | `"jitter_x"` | Output column name |
-| `seed` | `20220701` | Random seed |
-
-### Beeswarm
-
-Computes collision-avoiding x-offsets per group. Better than jitter for small n, but slower.
-
-```python
-df = theme.add_beeswarm_offsets(
-    df,
-    y_col="value",
-    group_by=["group"],
-    height_px=200,
-    markSize=10,
-)
-```
-
-| Parameter | Default | Description |
-|---|---|---|
-| `y_col` | required | Value column |
-| `group_by` | required | Column(s) defining each beeswarm group |
-| `height_px` | theme `chartHeight` | Chart height in pixels |
-| `markSize` | `10` | Point size (area in sq px) |
-| `out_col` | `"beeswarm_x"` | Output column name |
 
 ---
 

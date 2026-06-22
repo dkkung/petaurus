@@ -6,28 +6,37 @@ import polars as pl
 def beeswarm_offsets(
     y_vals,
     height_px: int | None = None,
-    markSize: float = 10,
+    spread: float = 2.0,
     step: float | None = None,
 ) -> np.ndarray:
     """
     Compute x offsets (pixels) for a beeswarm plot using collision avoidance.
 
-    Converts y values to pixel space, then places each point at the nearest
-    x position (outward from 0) that does not overlap any already-placed point.
-    Use the result as an ``xOffset`` column in Altair.
+    Algorithm
+    ---------
+    1. Map y values linearly to pixel space over ``[0, height_px]``.
+    2. Sort points by y-pixel position (ascending).
+    3. For each point, try x = 0, then ±step, ±2·step, … until a position is
+       found where no already-placed point is within distance 2·spread (i.e.
+       the circles do not overlap).
+    4. Return the accepted x offsets in the original row order.
+
+    ``spread`` is the collision radius in pixels — visually, the half-width of
+    each point in the offset axis.  The total beeswarm width is emergent:
+    it grows with n and shrinks with spread.
 
     Parameters
     ----------
     y_vals:
-        Array of y values for one group (e.g. one treatment × time combination).
+        Array of y values for one group.
     height_px:
         Chart height in pixels. Should match ``.properties(height=...)``.
-    markSize:
-        Altair mark size (area in sq px). Should match the ``size=`` kwarg on
-        the mark. Defaults to the theme's ``markSize`` default of 10.
+    spread:
+        Collision radius in pixels. Points are placed so no two centres are
+        closer than ``2 * spread``. Defaults to 2.0.
     step:
-        x step size (px) between candidate positions. Defaults to the point
-        radius derived from ``markSize``.
+        x step size (px) between candidate positions. Defaults to ``spread``
+        so the candidate grid aligns with the point diameter.
 
     Returns
     -------
@@ -41,21 +50,21 @@ def beeswarm_offsets(
         df = (
             df
             .with_row_index("__idx")
-            .group_by(["Metadata_Treatment", "Metadata_Time"])
+            .group_by(["group", "time"])
             .map_groups(lambda g: g.with_columns(
                 pl.Series("beeswarm_x", theme.beeswarm_offsets(
-                    g["my_column"].to_numpy(),
+                    g["value"].to_numpy(),
                     height_px=200,
-                    markSize=10,
+                    spread=2.0,
                 ))
             ))
             .sort("__idx")
             .drop("__idx")
         )
 
-        alt.Chart(df).mark_circle(size=10).encode(
-            x=alt.X("Metadata_Time:O"),
-            y=alt.Y("my_column:Q"),
+        alt.Chart(df).mark_circle().encode(
+            x=alt.X("time:O"),
+            y=alt.Y("value:Q"),
             xOffset=alt.XOffset("beeswarm_x:Q"),
         )
     """
@@ -67,7 +76,7 @@ def beeswarm_offsets(
     if n == 0:
         return np.array([])
 
-    r = np.sqrt(markSize / np.pi)
+    r = spread
     if step is None:
         step = r
 
@@ -101,12 +110,12 @@ def beeswarm_offsets(
     return offsets
 
 
-def add_beeswarm_offsets(
+def add_beeswarm(
     df: pl.DataFrame,
     y_col: str,
     group_by: list[str],
     height_px: int | None = None,
-    markSize: float = 10,
+    spread: float = 2.0,
     step: float | None = None,
     out_col: str = "beeswarm_x",
 ) -> pl.DataFrame:
@@ -116,6 +125,10 @@ def add_beeswarm_offsets(
     A convenience wrapper around :func:`beeswarm_offsets` that handles the
     ``with_row_index`` / ``map_groups`` / ``sort`` / ``drop`` pattern.
 
+    ``spread`` is the collision radius in pixels — set it to roughly half the
+    rendered point diameter for non-overlapping points.  The total horizontal
+    width of the beeswarm grows with n.
+
     Parameters
     ----------
     df:
@@ -123,14 +136,13 @@ def add_beeswarm_offsets(
     y_col:
         Name of the column containing y values.
     group_by:
-        Column name(s) that define each beeswarm group (e.g.
-        ``["Metadata_Treatment", "Metadata_Time"]``).
+        Column name(s) that define each beeswarm group.
     height_px:
         Chart height in pixels.
-    markSize:
-        Altair mark size (area in sq px).
+    spread:
+        Collision radius in pixels. Defaults to 2.0.
     step:
-        x step size (px). Defaults to the point radius.
+        x step size (px). Defaults to ``spread``.
     out_col:
         Name of the output offset column added to the DataFrame.
 
@@ -143,17 +155,11 @@ def add_beeswarm_offsets(
     --------
     ::
 
-        df = theme.add_beeswarm_offsets(
-            df,
-            y_col="percent",
-            group_by=["Metadata_Treatment", "Metadata_Time"],
-            height_px=200,
-            markSize=10,
-        )
+        df = theme.add_beeswarm(df, y_col="value", group_by=["group"], spread=2.0)
 
-        alt.Chart(df).mark_circle(size=10).encode(
-            x=alt.X("Metadata_Time:O"),
-            y=alt.Y("percent:Q"),
+        alt.Chart(df).mark_circle().encode(
+            x=alt.X("group:N"),
+            y=alt.Y("value:Q"),
             xOffset=alt.XOffset("beeswarm_x:Q"),
         )
     """
@@ -167,7 +173,7 @@ def add_beeswarm_offsets(
                     beeswarm_offsets(
                         g[y_col].to_numpy(),
                         height_px=height_px,
-                        markSize=markSize,
+                        spread=spread,
                         step=step,
                     ),
                 )
@@ -178,28 +184,27 @@ def add_beeswarm_offsets(
     )
 
 
-def add_jitter_offsets(
+def add_jitter(
     df: pl.DataFrame,
-    scale: float = 5.0,
+    spread: float = 2.0,
     out_col: str = "jitter_x",
     seed: int | None = 2022_07_01,
 ) -> pl.DataFrame:
     """
     Add a column of random Gaussian x-offsets to a Polars DataFrame.
 
-    Each point receives an independent offset drawn from N(0, scale). Use the
-    result as an ``xOffset`` column in Altair to jitter points horizontally.
-
-    Unlike :func:`add_beeswarm_offsets`, there is no collision avoidance —
-    points can overlap. This is faster and simpler for large datasets where
-    some overlap is acceptable.
+    Each offset is drawn independently from N(0, spread²), where ``spread``
+    is the standard deviation in pixels.  ~68% of points fall within
+    ±spread of centre; ~95% within ±2·spread.  There is no collision
+    avoidance — points can overlap.  Use :func:`add_beeswarm` instead for
+    small n where overlap is undesirable.
 
     Parameters
     ----------
     df:
         Input DataFrame.
-    scale:
-        Standard deviation of the jitter in pixels.
+    spread:
+        Standard deviation of the jitter in pixels. Defaults to 5.0.
     out_col:
         Name of the output offset column added to the DataFrame.
     seed:
@@ -214,7 +219,7 @@ def add_jitter_offsets(
     --------
     ::
 
-        df = theme.add_jitter_offsets(df, scale=5)
+        df = theme.add_jitter(df, spread=5)
 
         alt.Chart(df).mark_circle().encode(
             x=alt.X("group:N"),
@@ -223,4 +228,4 @@ def add_jitter_offsets(
         )
     """
     rng = np.random.default_rng(seed)
-    return df.with_columns(pl.Series(out_col, rng.normal(0, scale, len(df))))
+    return df.with_columns(pl.Series(out_col, rng.normal(0, spread, len(df))))

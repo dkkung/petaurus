@@ -4,7 +4,7 @@ import altair as alt
 import numpy as np
 import polars as pl
 
-from .transforms import add_beeswarm_offsets, add_jitter_offsets
+from .transforms import add_beeswarm, add_jitter
 
 _UNSET = object()
 
@@ -187,7 +187,7 @@ def mark_strip(
     palette: list[str] | None = None,
     point_size: int | None = None,
     point_opacity: float | None = None,
-    jitter_scale: float = 4.0,
+    spread: float = 2.0,
     legend: bool = False,
     errorbars: bool = True,
     errorbar_extent: str = "sem",
@@ -215,9 +215,11 @@ def mark_strip(
         Size of individual points. Inherits ``markSize`` from theme when ``None``.
     point_opacity:
         Opacity of individual points.
-    jitter_scale:
-        Standard deviation of jitter offsets in pixels. Only used when
-        ``scatter='jitter'``.
+    spread:
+        Controls point spread in pixels. For ``'jitter'``: standard deviation
+        of the Gaussian offsets (~68% of points within ±spread). For
+        ``'beeswarm'``: collision radius (points placed so no two centres are
+        closer than 2·spread); total width grows with n.
     median_size:
         Width of the median/mean indicator in pixels.
     errorbars:
@@ -244,10 +246,10 @@ def mark_strip(
         point_opacity = alt.theme.options.get("markFillOpacity", 1.0)
 
     if scatter == "jitter":
-        df = add_jitter_offsets(df, scale=jitter_scale)
+        df = add_jitter(df, spread=spread)
         offset_col = "jitter_x"
     elif scatter == "beeswarm":
-        df = add_beeswarm_offsets(df, y_col=y_col, group_by=[x_col])
+        df = add_beeswarm(df, y_col=y_col, group_by=[x_col], spread=spread)
         offset_col = "beeswarm_x"
     else:
         raise ValueError(f"scatter must be 'jitter' or 'beeswarm', got {scatter!r}")
