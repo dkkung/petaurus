@@ -63,7 +63,7 @@ colors = {
         "#663693",
         "#4B2F87",
     ],
-    "rose": [
+    "pinks": [
         "#F6DDDC",
         "#F1C9CB",
         "#ECB4BC",
@@ -259,7 +259,7 @@ colors = {
         "#292929",
         "#1B1B1B",
     ],
-    "roses2": [
+    "pinks2": [
         "#F4D4DE",
         "#EEB9CB",
         "#E99EB8",
@@ -785,7 +785,7 @@ colors = {
         "#5F8CBD",
         "#4177B1",
     ],
-    "rosesblues": [
+    "pinksblues": [
         "#C35082",
         "#CE6D94",
         "#D989A7",
@@ -860,7 +860,7 @@ colors = {
         "#867BB8",
         "#7263AB",
     ],
-    "greysrose": [
+    "greyspinks": [
         "#636363",
         "#7A7A7A",
         "#919191",
@@ -965,7 +965,7 @@ colors = {
         "#52B078",
         "#1CA15F",
     ],
-    "rosescyans": [
+    "pinkscyans": [
         "#C35082",
         "#CE6D94",
         "#D989A7",
@@ -980,7 +980,7 @@ colors = {
         "#608D8D",
         "#417979",
     ],
-    "rosesgreens": [
+    "pinksgreens": [
         "#BA5981",
         "#CC7195",
         "#DC8BA9",
@@ -995,7 +995,7 @@ colors = {
         "#4B9B64",
         "#2A854C",
     ],
-    "rosesneongreens": [
+    "pinksneongreens": [
         "#C35082",
         "#CE6D94",
         "#D989A7",
