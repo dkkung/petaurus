@@ -187,7 +187,7 @@ def mark_strip(
     palette: list[str] | None = None,
     point_size: int | None = None,
     point_opacity: float | None = None,
-    spread: float = 2.0,
+    spread: float | None = None,
     legend: bool = False,
     errorbars: bool = True,
     errorbar_extent: str = "sem",

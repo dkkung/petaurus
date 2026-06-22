@@ -216,13 +216,13 @@ alt.Chart(df).mark_circle().encode(
 
 | Parameter | Default | Description |
 |---|---|---|
-| `spread` | `2.0` | Standard deviation of jitter in pixels |
+| `spread` | `2.0` | Standard deviation of jitter in pixels. Pass `None` to use `2.0` |
 | `out_col` | `"jitter_x"` | Output column name |
 | `seed` | `20220701` | Random seed |
 
 ### dysonsphere.add_beeswarm()
 
-Computes collision-avoiding x-offsets per group. Points are sorted by y position and placed at the nearest x that doesn't overlap any already-placed point (tried in order: 0, ±step, ±2·step, …). Better than jitter for small n, but slower. Total width grows with n.
+Computes collision-avoiding x-offsets per group using an analytic method. Points are sorted by y position and placed greedily from the centre outward: for each point, the forbidden x intervals imposed by already-placed neighbours are computed exactly as `px ± √((2·spread)² − dy²)`, and the candidate closest to 0 outside all intervals is chosen. Better than jitter for small n; total width grows with n.
 
 ```python
 df = theme.add_beeswarm(df, y_col="value", group_by=["group"], spread=2.0)
@@ -238,7 +238,7 @@ alt.Chart(df).mark_circle().encode(
 |---|---|---|
 | `y_col` | required | Value column |
 | `group_by` | required | Column(s) defining each beeswarm group |
-| `spread` | `2.0` | Collision radius in pixels — points placed so no two centres are closer than 2·spread |
+| `spread` | `√(markSize/π)` | Collision radius in pixels — defaults to the rendered point radius from the active theme |
 | `height_px` | theme `chartHeight` | Chart height in pixels |
 | `out_col` | `"beeswarm_x"` | Output column name |
 
@@ -356,7 +356,7 @@ chart = theme.mark_strip(df, "group", "value", CATEGORIES, scatter="beeswarm")
 | `scatter` | `"jitter"` | `"jitter"` (fast, random Gaussian) or `"beeswarm"` (collision-avoidance) |
 | `palette` | `None` | List of colors for points |
 | `point_size` | theme `markSize` | Point size in sq px |
-| `spread` | `2.0` | Point spread in pixels (std dev for jitter, collision radius for beeswarm) |
+| `spread` | `None` | Point spread in pixels. For jitter: std dev (defaults to 2.0). For beeswarm: collision radius (defaults to `√(markSize/π)`) |
 | `errorbars` | `True` | Show mean ± error bars |
 | `errorbar_extent` | `"sem"` | `"sem"` or `"sd"` |
 

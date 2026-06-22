@@ -6,8 +6,7 @@ import polars as pl
 def beeswarm_offsets(
     y_vals,
     height_px: int | None = None,
-    spread: float = 2.0,
-    step: float | None = None,
+    spread: float | None = None,
 ) -> np.ndarray:
     """
     Compute x offsets (pixels) for a beeswarm plot using collision avoidance.
@@ -70,6 +69,8 @@ def beeswarm_offsets(
     """
     if height_px is None:
         height_px = alt.theme.options.get("chartHeight", 300)
+    if spread is None:
+        spread = np.sqrt(alt.theme.options.get("markSize", 10) / np.pi)
 
     y_vals = np.asarray(y_vals, dtype=float)
     n = len(y_vals)
@@ -77,13 +78,11 @@ def beeswarm_offsets(
         return np.array([])
 
     r = spread
-    if step is None:
-        step = r
+    d = 2 * r  # minimum centre-to-centre distance
 
     y_min, y_max = y_vals.min(), y_vals.max()
     y_px = (y_vals - y_min) / max(y_max - y_min, 1e-9) * height_px
 
-    min_dist_sq = (2 * r) ** 2
     order = np.argsort(y_px)
     placed_y = np.empty(n)
     placed_x = np.empty(n)
@@ -92,20 +91,29 @@ def beeswarm_offsets(
 
     for idx in order:
         y = y_px[idx]
-        nearby = np.abs(placed_y[:n_placed] - y) <= 4 * r
-        for k in range(1000):
-            for cx in [0.0] if k == 0 else [k * step, -k * step]:
-                ny = placed_y[:n_placed][nearby]
-                nx = placed_x[:n_placed][nearby]
-                if len(ny) == 0 or np.all((ny - y) ** 2 + (nx - cx) ** 2 >= min_dist_sq):
-                    placed_y[n_placed] = y
-                    placed_x[n_placed] = cx
-                    n_placed += 1
-                    offsets[idx] = cx
-                    break
-            else:
+
+        # For each already-placed point within vertical range, compute the
+        # forbidden x interval: placed_x[j] ± sqrt((2r)² - dy²).
+        # The optimal x is the candidate closest to 0 outside all intervals.
+        candidates = [0.0]
+        for j in range(n_placed):
+            dy = abs(placed_y[j] - y)
+            if dy >= d:
                 continue
-            break
+            half = np.sqrt(d ** 2 - dy ** 2)
+            candidates.append(placed_x[j] + half)
+            candidates.append(placed_x[j] - half)
+
+        # Pick the candidate closest to 0 that doesn't overlap any placed point.
+        candidates.sort(key=abs)
+        for cx in candidates:
+            dists_sq = (placed_y[:n_placed] - y) ** 2 + (placed_x[:n_placed] - cx) ** 2
+            if n_placed == 0 or np.all(dists_sq >= d ** 2 - 1e-9):
+                placed_y[n_placed] = y
+                placed_x[n_placed] = cx
+                n_placed += 1
+                offsets[idx] = cx
+                break
 
     return offsets
 
@@ -115,8 +123,7 @@ def add_beeswarm(
     y_col: str,
     group_by: list[str],
     height_px: int | None = None,
-    spread: float = 2.0,
-    step: float | None = None,
+    spread: float | None = None,
     out_col: str = "beeswarm_x",
 ) -> pl.DataFrame:
     """
@@ -140,9 +147,8 @@ def add_beeswarm(
     height_px:
         Chart height in pixels.
     spread:
-        Collision radius in pixels. Defaults to 2.0.
-    step:
-        x step size (px). Defaults to ``spread``.
+        Collision radius in pixels. Defaults to ``sqrt(markSize / π)`` from
+        the active theme, so points naturally match the rendered mark size.
     out_col:
         Name of the output offset column added to the DataFrame.
 
@@ -174,7 +180,6 @@ def add_beeswarm(
                         g[y_col].to_numpy(),
                         height_px=height_px,
                         spread=spread,
-                        step=step,
                     ),
                 )
             )
@@ -186,7 +191,7 @@ def add_beeswarm(
 
 def add_jitter(
     df: pl.DataFrame,
-    spread: float = 2.0,
+    spread: float | None = None,
     out_col: str = "jitter_x",
     seed: int | None = 2022_07_01,
 ) -> pl.DataFrame:
@@ -227,5 +232,7 @@ def add_jitter(
             xOffset=alt.XOffset("jitter_x:Q"),
         )
     """
+    if spread is None:
+        spread = 2.0
     rng = np.random.default_rng(seed)
     return df.with_columns(pl.Series(out_col, rng.normal(0, spread, len(df))))
