@@ -118,6 +118,13 @@ def custom():
             None if opts["transparentBackground"] else opts["chartFill"]
         ),  # background of the entire view
         "config": {
+            "arc": {
+                "fill": opts["markFill"],
+                "fillOpacity": opts["markFillOpacity"],
+                "stroke": opts["markStroke"],
+                "strokeOpacity": opts["markStrokeOpacity"],
+                "strokeWidth": opts["markStrokeWidth"],
+            },
             "area": {
                 "fill": opts["markFill"],
                 "fillOpacity": opts["markFillOpacity"],
@@ -226,6 +233,19 @@ def custom():
                 "strokeOpacity": opts["markStrokeOpacity"],
                 "strokeWidth": opts["markStrokeWidth"],
             },
+            "errorband": {
+                "band": {
+                    "fillOpacity": 0.90,
+                    "stroke": None,
+                    "strokeWidth": opts["markStrokeWidth"],
+                    "strokeOpacity": opts["markStrokeOpacity"],
+                },
+                "borders": {
+                    "opacity": 0,
+                    "strokeOpacity": opts["markStrokeWidth"],
+                    "strokeWidth": opts["markStrokeOpacity"],
+                },
+            },
             "errorbar": {
                 "opacity": 1,
                 "rule": {"strokeDash": [0, 0]},
@@ -238,6 +258,13 @@ def custom():
                 "thickness": opts["markStrokeWidth"],
             },
             "font": opts["font"],
+            "geoshape": {
+                "fill": opts["markFill"],
+                "fillOpacity": opts["markFillOpacity"],
+                "stroke": "white" if opts["darkmode"] else "black",
+                "strokeOpacity": opts["markStrokeOpacity"],
+                "strokeWidth": opts["markStrokeWidth"],
+            },
             "header": {
                 "labelColor": "white" if opts["darkmode"] else "black",
                 "labelFont": opts["font"],
