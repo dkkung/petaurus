@@ -55,3 +55,4 @@ pipenv
 *.svg
 *.json
 !docs/thumbnail_light.png
+!docs/grid_labels_example_light.png

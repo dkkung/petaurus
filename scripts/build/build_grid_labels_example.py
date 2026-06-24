@@ -1,7 +1,7 @@
 """
 Generates docs/grid_labels_example_light.png — the README preview for add_grid_labels.
 
-Shows all three grid label styles (plusminus, dot, text) side by side,
+Shows all three grid label styles (plusminus, symbol, text) side by side,
 each attached below a strip chart via add_grid_labels().
 
 Usage (from project root):
