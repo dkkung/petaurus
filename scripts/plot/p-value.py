@@ -33,30 +33,16 @@ chart = (
     )
 )
 
-# normal bracket above data
-ann_a = theme.pvalue_layer(
+ann = theme.add_pvalue(
     df,
     "group",
     "value",
-    "Control",
-    "Drug A",
+    pairs=[("Control", "Drug A"), ("Control", "Drug B"), ("Drug A", "Drug B")],
     test="mannwhitneyu",
     categories=CATEGORIES,
-    y=21,
+    y_positions=[21, 5, 24],
+    reverse=[("Control", "Drug B")],
 )
 
-# reversed bracket below data
-ann_b = theme.pvalue_layer(
-    df,
-    "group",
-    "value",
-    "Control",
-    "Drug B",
-    test="mannwhitneyu",
-    categories=CATEGORIES,
-    y=5,
-    reverse=True,
-)
-
-theme.save(chart + ann_a + ann_b, "p-value")
+theme.save(chart + ann, "p-value")
 print("saved p-value")

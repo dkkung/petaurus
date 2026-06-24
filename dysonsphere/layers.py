@@ -28,7 +28,7 @@ def mark_violin(
     Build an Altair layer combining a violin plot behind a boxplot.
 
     Returns a ``LayerChart`` that can be saved directly or composed with other
-    layers (e.g. ``theme.pvalue_layer``).
+    layers (e.g. ``theme.add_pvalue``).
 
     Parameters
     ----------
@@ -194,7 +194,7 @@ def mark_strip(
     Build an Altair layer combining jittered or beeswarm points with a median indicator.
 
     Returns a ``LayerChart`` that can be saved directly or composed with other
-    layers (e.g. ``theme.pvalue_layer``).
+    layers (e.g. ``theme.add_pvalue``).
 
     Parameters
     ----------
@@ -326,7 +326,7 @@ def _format_pvalue(p: float, decimals: int = 3) -> str:
     return f"p = {p:.{decimals}f}"
 
 
-def pvalue_layer(
+def _pvalue_layer(
     df: pl.DataFrame | None = None,
     x_col: str | None = None,
     y_col: str | None = None,
@@ -348,84 +348,6 @@ def pvalue_layer(
     reverse: bool = False,
     decimals: int = 3,
 ) -> alt.LayerChart:
-    """
-    Build an Altair layer with a p-value annotation between two groups.
-
-    Combine with your chart using ``+``:  ``chart + pvalue_layer(...)``.
-
-    Parameters
-    ----------
-    df:
-        Polars DataFrame. Required unless both ``pvalue`` and ``y`` are provided.
-    x_col:
-        Column name for the grouping variable (x-axis).
-    y_col:
-        Column name for the value variable (y-axis). Used to extract group
-        data for the test and to auto-place the bracket when ``y`` is omitted.
-    group1, group2:
-        Values in ``x_col`` identifying the two groups to compare.
-    test:
-        Scipy test to run: ``'mannwhitneyu'``, ``'ttest_ind'``, ``'ttest_rel'``,
-        ``'wilcoxon'``, or ``'tukey_hsd'``. Ignored when ``pvalue`` is provided.
-    pvalue:
-        Pre-computed p-value. Skips the statistical test entirely.
-    correction:
-        Multiple comparison correction: ``'bonferroni'`` or ``None``.
-        Ignored for ``tukey_hsd`` (correction is built in).
-    n_comparisons:
-        Total number of comparisons for Bonferroni correction.
-    y:
-        Y position of the bracket in data units. Defaults to
-        ``max(group data) + y_pad``.
-    y_pad:
-        Padding above the group maximum when ``y`` is auto-placed.
-    tick_height:
-        Height of the bracket end ticks in data units. Only used when
-        ``style='bracket'``.
-    style:
-        ``'line'`` (horizontal bar only) or ``'bracket'`` (bar + end ticks).
-    categories:
-        Ordered list of all x-axis categories, used to compute the midpoint
-        pixel position for the text label. Inferred from ``df`` if not provided
-        (sorted alphabetically, matching Vega-Lite's default nominal ordering).
-    chartWidth:
-        Width of the chart in pixels. Used with ``categories`` to compute
-        text x position. Should match ``.properties(width=...)``.
-    strokeWidth:
-        Stroke width of bracket lines. Defaults to ``axisWidth`` from
-        ``theme.options()``, or 0.5 if the theme has not been configured.
-    fontSize:
-        Font size of the p-value label in points. Defaults to ``fontSize``
-        from ``theme.options()``, or 7 if the theme has not been configured.
-    reverse:
-        If True, flips the annotation to the other side of the line/bracket —
-        text moves below the bar and ticks point upward.
-    decimals:
-        Decimal places for the p-value label when ``p >= 0.001``.
-
-    Examples
-    --------
-    From a DataFrame::
-
-        chart = alt.Chart(df).mark_point().encode(x="group:N", y="value:Q")
-        ann = theme.pvalue_layer(
-            df, "group", "value", "Control", "Drug A",
-            test="mannwhitneyu", y=210,
-            categories=["Control", "Drug A", "Drug B"],
-            chart_width=300,
-        )
-        chart + ann
-
-    From a pre-computed p-value::
-
-        _, p = scipy.stats.mannwhitneyu(ctrl, drug_a)
-        ann = theme.pvalue_layer(
-            group1="Control", group2="Drug A",
-            pvalue=p, y=210,
-            categories=["Control", "Drug A", "Drug B"],
-            chart_width=300,
-        )
-    """
     from scipy import stats as _stats
 
     # --- p-value ---
@@ -533,7 +455,7 @@ def pvalue_layer(
     return alt.layer(bar, text)
 
 
-def pvalue_layers(
+def add_pvalue(
     df: pl.DataFrame,
     x_col: str,
     y_col: str,
@@ -553,16 +475,17 @@ def pvalue_layers(
     tick_height: float = 0.5,
     strokeWidth: float | None = None,
     fontSize: int | None = None,
+    reverse: list[tuple[str, str]] | None = None,
     decimals: int = 3,
 ) -> alt.LayerChart:
     """
-    Build stacked p-value annotation layers for multiple group comparisons.
+    Build p-value annotation layers for one or more group comparisons.
 
-    A batch version of :func:`pvalue_layer` that automatically stacks brackets
-    so they don't overlap. Shorter-span pairs are placed lower; pairs whose
-    x-ranges overlap are bumped to the next level.
+    Brackets are stacked automatically so they don't overlap. Shorter-span
+    pairs are placed lower; pairs whose x-ranges overlap are bumped to the
+    next level.
 
-    Combine with your chart using ``+``:  ``chart + pvalue_layers(...)``.
+    Combine with your chart using ``+``:  ``chart + add_pvalue(...)``.
 
     Parameters
     ----------
@@ -574,7 +497,8 @@ def pvalue_layers(
         Column name for the value variable (y-axis). Used to run tests and
         to auto-place the first bracket.
     pairs:
-        List of ``(group1, group2)`` tuples identifying the comparisons to annotate.
+        List of ``(group1, group2)`` tuples identifying the comparisons to
+        annotate. Pass a single-element list for one comparison.
     test:
         Scipy test to run for each pair: ``'mannwhitneyu'``, ``'ttest_ind'``,
         ``'ttest_rel'``, ``'wilcoxon'``, or ``'tukey_hsd'``. Ignored when
@@ -618,27 +542,36 @@ def pvalue_layers(
     fontSize:
         Font size of p-value labels. Inherits ``fontSize`` from
         ``theme.options()`` when not set.
+    reverse:
+        List of ``(group1, group2)`` tuples identifying brackets to flip —
+        text moves below the bar and ticks point upward.
     decimals:
         Decimal places for p-value labels when ``p >= 0.001``.
 
     Examples
     --------
-    Run tests and annotate three pairs::
+    Single comparison::
 
         CATEGORIES = ["Control", "Drug A", "Drug B"]
-        theme.options(chartWidth=300)
         chart = theme.mark_strip(df, "group", "value", CATEGORIES)
-        ann = theme.pvalue_layers(
+        chart + theme.add_pvalue(
+            df, "group", "value",
+            pairs=[("Control", "Drug A")],
+            categories=CATEGORIES,
+        )
+
+    Multiple comparisons — brackets stacked automatically::
+
+        chart + theme.add_pvalue(
             df, "group", "value",
             pairs=[("Control", "Drug A"), ("Control", "Drug B"), ("Drug A", "Drug B")],
             test="mannwhitneyu",
             categories=CATEGORIES,
         )
-        chart + ann
 
     From pre-computed p-values::
 
-        ann = theme.pvalue_layers(
+        chart + theme.add_pvalue(
             df, "group", "value",
             pairs=[("Control", "Drug A"), ("Control", "Drug B")],
             pvalues=[0.012, 0.341],
@@ -733,7 +666,7 @@ def pvalue_layers(
     layer_charts = []
     for i, ((g1, g2), pval) in enumerate(zip(pairs, computed_pvalues)):
         layer_charts.append(
-            pvalue_layer(
+            _pvalue_layer(
                 group1=g1,
                 group2=g2,
                 pvalue=pval,
@@ -744,6 +677,7 @@ def pvalue_layers(
                 chartWidth=chartWidth,
                 strokeWidth=strokeWidth,
                 fontSize=fontSize,
+                reverse=(g1, g2) in reverse if reverse is not None else False,
                 decimals=decimals,
             )
         )

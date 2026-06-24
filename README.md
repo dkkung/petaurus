@@ -246,19 +246,20 @@ alt.Chart(df).mark_circle().encode(
 
 ## Statistical annotations
 
-`pvalue_layer()` adds a single p-value bracket between two groups; `pvalue_layers()` annotates multiple comparisons at once, stacking brackets automatically so they don't overlap. Combine with any chart using `+`.
+`add_pvalue()` annotates one or more group comparisons with p-value brackets, stacking them automatically so they don't overlap. Combine with any chart using `+`.
 
 ```python
 CATEGORIES = ["Control", "Drug A", "Drug B"]
 
 # single comparison
-chart + theme.pvalue_layer(
-    df, "group", "value", "Control", "Drug A",
+chart + theme.add_pvalue(
+    df, "group", "value",
+    pairs=[("Control", "Drug A")],
     categories=CATEGORIES, chartWidth=300,
 )
 
 # multiple comparisons — brackets stacked automatically
-chart + theme.pvalue_layers(
+chart + theme.add_pvalue(
     df, "group", "value",
     pairs=[("Control", "Drug A"), ("Control", "Drug B"), ("Drug A", "Drug B")],
     categories=CATEGORIES, chartWidth=300,
@@ -268,47 +269,33 @@ chart + theme.pvalue_layers(
 From pre-computed p-values:
 
 ```python
-# single
-theme.pvalue_layer(..., pvalue=0.023, y=210)
+theme.add_pvalue(..., pvalues=[0.023], y_positions=[210])
 
 # batch
-theme.pvalue_layers(..., pvalues=[0.002, 0.031])
+theme.add_pvalue(..., pvalues=[0.002, 0.031])
 ```
 
-**Shared parameters**
+**Parameters**
 
 | Parameter | Default | Description |
 |---|---|---|
 | `df` | required | Polars DataFrame |
 | `x_col`, `y_col` | required | Column names for groups and values |
-| `test` | `"mannwhitneyu"` | Statistical test: `"mannwhitneyu"`, `"ttest_ind"`, `"ttest_rel"`, `"wilcoxon"`, `"tukey_hsd"` |
-| `correction` | `None` | `"bonferroni"` or `None`. Ignored for `tukey_hsd` |
-| `n_comparisons` | `1` / `len(pairs)` | Number of comparisons for Bonferroni correction |
-| `y_pad` | `5` | Padding above data max when y is auto-placed |
-| `style` | `"line"` | `"line"` (bar only) or `"bracket"` (bar + end ticks) |
-| `categories` | inferred | Ordered list of all x-axis categories |
-| `chartWidth` | theme default | Chart width used to compute text x position |
-| `decimals` | `3` | Decimal places in the p-value label |
-
-**`pvalue_layer()` only**
-
-| Parameter | Default | Description |
-|---|---|---|
-| `group1`, `group2` | required | Group labels to compare |
-| `pvalue` | `None` | Pre-computed p-value (skips the test) |
-| `y` | auto | Y position of the bracket in data units |
-| `reverse` | `False` | Flip the annotation below the bar |
-
-**`pvalue_layers()` only**
-
-| Parameter | Default | Description |
-|---|---|---|
 | `pairs` | required | List of `(group1, group2)` tuples to annotate |
+| `test` | `"mannwhitneyu"` | Statistical test: `"mannwhitneyu"`, `"ttest_ind"`, `"ttest_rel"`, `"wilcoxon"`, `"tukey_hsd"` |
 | `pvalues` | `None` | Pre-computed p-values, one per pair (skips all tests) |
+| `correction` | `None` | `"bonferroni"` or `None`. Ignored for `tukey_hsd` |
+| `n_comparisons` | `len(pairs)` | Number of comparisons for Bonferroni correction |
 | `y_positions` | `None` | Explicit y positions per bracket (overrides auto-stacking) |
 | `y_start` | auto | Y position of the lowest bracket |
 | `y_step` | `y_pad × 2` | Vertical distance between stacking levels |
+| `y_pad` | `5` | Padding above data max when y_start is auto-placed |
+| `style` | `"line"` | `"line"` (bar only) or `"bracket"` (bar + end ticks) |
 | `tick_height` | `0.5` | End tick height in data units (only for `style="bracket"`) |
+| `reverse` | `None` | List of `(group1, group2)` tuples identifying brackets to flip below the bar |
+| `categories` | inferred | Ordered list of all x-axis categories |
+| `chartWidth` | theme default | Chart width used to compute text x position |
+| `decimals` | `3` | Decimal places in the p-value label |
 
 ---
 

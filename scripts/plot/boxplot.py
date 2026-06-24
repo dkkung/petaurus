@@ -61,26 +61,24 @@ points = base.mark_circle(size=5).encode(
     xOffset=alt.XOffset("beeswarm_x:Q"),
 )
 
-ann_a = theme.pvalue_layer(
+ann_a = theme.add_pvalue(
     df,
     "group",
     "value",
-    "Control",
-    "Drug A",
+    pairs=[("Control", "Drug A")],
     test="mannwhitneyu",
     categories=CATEGORIES,
-    y=21,
+    y_positions=[21],
 )
 
-ann_b = theme.pvalue_layer(
+ann_b = theme.add_pvalue(
     df,
     "group",
     "value",
-    "Control",
-    "Drug B",
+    pairs=[("Control", "Drug B")],
     test="mannwhitneyu",
     categories=CATEGORIES,
-    y=23,
+    y_positions=[23],
 )
 
 theme.save(points + boxplot + ann_a + ann_b, "boxplot")
