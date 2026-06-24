@@ -305,9 +305,9 @@ theme.add_pvalue(..., pvalues=[0.002, 0.031])
 
 ```python
 CONDITIONS = {
-    "Condition 1": ["+", "-", "+", "+"],
-    "Condition 2": ["-", "-", "+", "-"],
-    "Condition 3": ["-", "-", "-", "+"],
+    "Condition 1": [True,  False, True,  True],
+    "Condition 2": [False, False, True,  False],
+    "Condition 3": [False, False, False, True],
 }
 
 # attached — x-axis labels replaced by the table
@@ -320,20 +320,22 @@ alt.vconcat(
 ).resolve_scale(x="shared")
 ```
 
-Three `style` options are available: `"plusminus"` renders `+` / `−` symbols, `"dots"` renders filled and unfilled circles with an optional connecting rule, and `"text"` renders arbitrary strings (e.g. numeric scores) centered under each category.
+`groups` values should be booleans: `True` for a positive mark, `False` for a negative mark. If any value is a non-bool (`str`, `int`, `float`), the style is automatically set to `"text"` and values are rendered verbatim — useful for numeric scores or arbitrary labels.
+
+Three `style` options are available: `"plusminus"` renders `True` as `+` and `False` as `−`, `"dots"` renders `True` as a filled circle and `False` as an unfilled circle with an optional connecting rule, and `"text"` renders raw values as strings centered under each category.
 
 ![Grid labels example](https://raw.githubusercontent.com/dkkung/dysonsphere/main/docs/grid_labels_example_light.png)
 
 | Parameter | Default | Description |
 |---|---|---|
-| `groups` | required | `{row_label: [value, ...]}` — one value per category |
+| `groups` | required | `{row_label: [bool, ...]}` — one `True`/`False` per category; non-bool values force `style="text"` |
 | `categories` | required | Ordered list of x-axis categories matching the main chart |
-| `style` | `"plusminus"` | `"plusminus"`, `"dots"`, or `"text"` |
-| `label_align` | `"right"` | `"right"` places row labels right of the grid; `"left"` places them left |
+| `style` | `"plusminus"` | `"plusminus"`, `"dots"`, or `"text"` (auto-set when values are non-bool) |
+| `label_align` | `"left"` | `"left"` places row labels left of the grid; `"right"` places them right |
 | `label_padding` | `0` | Gap in pixels between the plot boundary and the label text |
 | `order` | insertion order | Top-to-bottom row order |
 | `row_height` | `14` | Height in pixels per row |
-| `connecting_line` | `True` | Draw a rule spanning the first to last `"+"` per row (`"dots"` style only) |
+| `connecting_line` | `True` | Draw a rule spanning each consecutive run of `True` values per row (`"dots"` style only) |
 | `dot_size` | `markSize × 4` | Dot area in square pixels (`"dots"` style only) |
 | `strokeWidth` | `markStrokeWidth` | Stroke width for dots and connecting rule |
 | `y_padding` | `0.1` | Inner padding between rows as a fraction of band step |

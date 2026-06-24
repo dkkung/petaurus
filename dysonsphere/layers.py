@@ -389,7 +389,7 @@ def _pvalue_layer(
 
     # --- resolve theme-linked defaults ---
     if chartWidth is None:
-        chartWidth = alt.theme.options.get("chartWidth", 400)
+        chartWidth = alt.theme.options.get("chartWidth", 100)
     if strokeWidth is None:
         strokeWidth = alt.theme.options.get("axisWidth", 0.5)
     if fontSize is None:
@@ -686,7 +686,7 @@ def add_pvalue(
 
 
 def add_grid_labels_detached(
-    groups: dict[str, list[str]],
+    groups: dict[str, list],
     categories: list[str],
     *,
     order: list[str] | None = None,
@@ -705,26 +705,34 @@ def add_grid_labels_detached(
     """
     Build a condition-table annotation chart to place below a strip/violin/boxplot.
 
-    Each key in ``groups`` is a row label; its value is a list of ``"+"`` or ``"-"``
-    strings, one per category (in the same order as ``categories``). Combine with the
-    main chart using ``alt.vconcat(chart, add_grid_labels_detached(...)).resolve_scale(x="shared")``.
+    Each key in ``groups`` is a row label; its value is a list of booleans (or
+    arbitrary strings/numbers), one per category. Combine with the main chart using
+    ``alt.vconcat(chart, add_grid_labels_detached(...)).resolve_scale(x="shared")``.
 
     Parameters
     ----------
     groups:
-        Mapping of row-label → list of ``"+"`` / ``"-"`` values. Length of each list
-        must equal ``len(categories)``.
+        Mapping of row-label → list of values, one per category. Values may be:
+
+        - **bool** — ``True`` renders a positive mark; ``False`` renders a negative
+          mark. The ``style`` parameter controls how positive/negative are displayed
+          (``"plusminus"`` or ``"dots"``).
+        - **str, int, or float** — any non-bool value triggers automatic ``style="text"``
+          regardless of the ``style`` parameter, and each value is rendered verbatim as
+          a string.
+
+        Length of each list must equal ``len(categories)``.
     categories:
         Ordered list of x-axis categories — the same list passed to ``mark_strip``
         or ``mark_violin``.
     order:
         Row display order (top to bottom). Defaults to ``dict`` insertion order.
     style:
-        ``"plusminus"`` renders literal ``+`` / ``−`` characters. ``"dots"`` renders
-        filled circles — black for ``"+"`` and ``greys[0]`` for ``"-"`` — with a
-        horizontal line connecting the leftmost to rightmost ``"+"`` in each row.
-        ``"text"`` renders the raw values from the ``groups`` dict as center-aligned
-        text, suitable for arbitrary labels.
+        ``"plusminus"`` renders ``True`` as ``+`` and ``False`` as ``−``.
+        ``"dots"`` renders ``True`` as a filled circle and ``False`` as an unfilled
+        circle, with a horizontal rule connecting each consecutive run of ``True``
+        values in a row. ``"text"`` renders raw group values as center-aligned strings
+        and is forced automatically when any value is non-bool.
     label_align:
         ``"left"`` (default) places row labels to the left of the grid with
         right-aligned text. ``"right"`` places them to the right with left-aligned text.
@@ -798,9 +806,9 @@ def add_grid_labels_detached(
         chart = theme.mark_strip(df, "group", "value", CATEGORIES)
         ann = theme.add_grid_labels_detached(
             {
-                "dTAG^V-1":       ["-", "+", "+", "+"],
-                "ZFC3H1 WT":      ["-", "-", "+", "-"],
-                "ZFC3H1(Δ730–747)": ["-", "-", "-", "+"],
+                "dTAG^V-1":         [False, True,  True,  True],
+                "ZFC3H1 WT":        [False, False, True,  False],
+                "ZFC3H1(Δ730–747)": [False, False, False, True],
             },
             categories=CATEGORIES,
             style="dots",
@@ -819,18 +827,29 @@ def add_grid_labels_detached(
                 f"in the same left-to-right order as the main chart."
             )
 
+    # Auto-detect style: any non-bool value forces text style.
+    # Must check isinstance(v, bool) before isinstance(v, int) because bool subclasses int.
+    all_values = [v for label in row_order for v in groups[label]]
+    if any(not isinstance(v, bool) for v in all_values):
+        style = "text"
+
     if style not in ("plusminus", "text", "dots"):
         raise ValueError(f"style must be 'plusminus', 'text', or 'dots', got {style!r}")
     if label_align not in ("left", "right"):
         raise ValueError(f"label_align must be 'left' or 'right', got {label_align!r}")
 
     if chartWidth is None:
-        chartWidth = alt.theme.options.get("chartWidth", 400)
+        chartWidth = alt.theme.options.get("chartWidth", 100)
     if fontSize is None:
         fontSize = alt.theme.options.get("fontSize", 7)
 
+    def _norm(v: object) -> str:
+        if isinstance(v, bool):
+            return "+" if v else "-"
+        return str(v)
+
     rows = [
-        {"__label": label, "__category": cat, "__value": val}
+        {"__label": label, "__category": cat, "__value": _norm(val)}
         for label in row_order
         for cat, val in zip(categories, groups[label])
     ]
@@ -854,7 +873,10 @@ def add_grid_labels_detached(
         axis=alt.Axis(labels=False, ticks=False, domain=False, title=None),
     )
 
-    label_x = alt.value(chartWidth + label_padding) if label_align == "right" else alt.value(-label_padding)
+    if label_align == "right":
+        label_x = alt.value(chartWidth + label_padding)
+    else:
+        label_x = alt.value(-label_padding)
     label_text_align = "left" if label_align == "right" else "right"
     label_df = pl.DataFrame({"__label": row_order})
     row_labels = (
@@ -864,9 +886,7 @@ def add_grid_labels_detached(
     )
 
     if style == "plusminus":
-        text_df = marks_df.with_columns(
-            pl.col("__value").replace({"-": "−"})
-        )
+        text_df = marks_df.with_columns(pl.col("__value").replace({"-": "−"}))
         # align="center" is required — without it Vega-Lite's vertical band
         # placement drifts relative to other marks on some versions.
         layer = (
@@ -930,7 +950,7 @@ def add_grid_labels_detached(
     for label in row_order:
         run: list[int] = []
         for i, v in enumerate(groups[label]):
-            if v == "+":
+            if v is True:
                 run.append(i)
             else:
                 if len(run) >= 2:
@@ -964,7 +984,7 @@ def add_grid_labels_detached(
 
 def add_grid_labels(
     chart: alt.Chart,
-    groups: dict[str, list[str]],
+    groups: dict[str, list],
     categories: list[str],
     *,
     spacing: int = 0,
@@ -973,8 +993,9 @@ def add_grid_labels(
     """
     Compose a chart with a grid annotation table, replacing its x-axis labels.
 
-    Strips x-axis labels and ticks from ``chart``, builds a :func:`add_grid_labels_detached`
-    layer, and returns ``alt.vconcat(chart, annotation, spacing=spacing).resolve_scale(x="shared")``.
+    Strips x-axis labels and ticks from ``chart``, builds a
+    :func:`add_grid_labels_detached` layer, and returns
+    ``alt.vconcat(chart, annotation, spacing=spacing).resolve_scale(x="shared")``.
 
     All keyword arguments beyond ``spacing`` are forwarded to :func:`add_grid_labels_detached`.
 
@@ -997,7 +1018,7 @@ def add_grid_labels(
         chart = theme.mark_strip(df, "group", "value", CATEGORIES)
         composed = theme.add_grid_labels(
             chart,
-            {"dTAG^V-1": ["-", "+", "+", "+"], "ZFC3H1 WT": ["-", "-", "+", "-"]},
+            {"dTAG^V-1": [False, True, True, True], "ZFC3H1 WT": [False, False, True, False]},
             categories=CATEGORIES,
             style="dots",
             label_align="right",
