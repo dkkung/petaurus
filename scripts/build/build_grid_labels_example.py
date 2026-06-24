@@ -8,13 +8,16 @@ Usage (from project root):
     uv run python scripts/build/build_grid_labels_example.py
 """
 
+import tempfile
 from pathlib import Path
 
 import altair as alt
 import numpy as np
 import polars as pl
+import vl_convert as vlc
 
 import dysonsphere as theme
+from dysonsphere.export import _fix_tick_alignment
 
 CATEGORIES = ["Control", "Drug A", "Drug B", "Drug C"]
 
@@ -47,7 +50,7 @@ SCORES = {
 
 
 def build_grid_labels_example():
-    theme.options()
+    theme.options(chartFill="white")
 
     out_base = str(Path(__file__).parent.parent.parent / "docs" / "grid_labels_example")
 
@@ -70,8 +73,20 @@ def build_grid_labels_example():
         txt = theme.add_grid_labels(corner_label("text"), SCORES, style="text", **KWARGS)
         return alt.hconcat(pm, dot, txt)
 
-    theme.save(make_chart, out_base, ppi=1200)
-    print(f"saved {out_base}_light.png")
+    out_png = Path(out_base + "_light.png")
+    with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as tmp:
+        tmp_path = tmp.name
+    make_chart().save(tmp_path)
+    _fix_tick_alignment(
+        tmp_path,
+        band_padding=alt.theme.options.get("bandPadding", 0.1),
+        chart_width=alt.theme.options.get("chartWidth", 100),
+    )
+    with open(tmp_path, encoding="utf-8") as f:
+        svg_content = f.read()
+    Path(tmp_path).unlink()
+    out_png.write_bytes(vlc.svg_to_png(svg_content, ppi=1200))
+    print(f"saved {out_png}")
 
 
 if __name__ == "__main__":
