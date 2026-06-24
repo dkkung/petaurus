@@ -1,10 +1,16 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING, Callable
 
 import altair as alt
 
+if TYPE_CHECKING:
+    pass
+
 
 def save(
-    chart: alt.Chart,
+    chart: alt.Chart | Callable[[], alt.Chart],
     filename: str,
     ppi: int = 1200,
     description: str | None = None,
@@ -24,7 +30,12 @@ def save(
     Parameters
     ----------
     chart:
-        The Altair chart to save.
+        The Altair chart to save, or a zero-argument callable that returns
+        one. When a callable is provided it is called fresh for each
+        light/dark variant — after ``darkmode`` has been toggled — so any
+        marks whose colours depend on ``theme.options()`` (e.g.
+        ``add_grid_labels``) are rebuilt with the correct palette each
+        time.
     filename:
         Extensionless path for the output files (e.g. ``"myplot"`` or
         ``"plots/myplot"``). A bare name saves to the current working
@@ -39,26 +50,37 @@ def save(
 
     Examples
     --------
-    ::
+    Static chart (existing behaviour)::
 
         theme.options()
         chart = alt.Chart(df).mark_point().encode(...)
         theme.save(chart, "plots/myplot")
-        # writes: plots/myplot_light.png, plots/myplot_light.svg,
-        #         plots/myplot_dark.png,  plots/myplot_dark.svg
+
+    Callable — rebuilt per variant so dark-mode colours are correct::
+
+        theme.save(
+            lambda: theme.add_grid_labels(chart, CONDITIONS, style="dot"),
+            "plots/myplot",
+        )
     """
     if not alt.theme.options:
         raise RuntimeError("theme.options() must be called before theme.save().")
 
-    if description is not None:
-        chart = chart.properties(description=description)
+    # _resolve() is called once per variant (or once for the spec).
+    # When chart is a callable it is re-invoked each time so that any
+    # marks whose colours read from alt.theme.options at construction time
+    # (e.g. add_grid_labels dot colours) pick up the correct
+    # darkmode value that was just toggled above.
+    def _resolve() -> alt.Chart:
+        c = chart() if callable(chart) else chart
+        return c.properties(description=description) if description is not None else c
 
     base = Path(filename)
     original_darkmode = alt.theme.options.get("darkmode", False)
     original_transparent = alt.theme.options.get("transparentBackground", False)
 
     if save_vega_spec:
-        chart.save(str(base.parent / f"{base.name}_vegalite.json"))
+        _resolve().save(str(base.parent / f"{base.name}_vegalite.json"))
 
     try:
         import vl_convert as vlc
@@ -66,8 +88,9 @@ def save(
         alt.theme.options["transparentBackground"] = True
         for mode, suffix in [(False, "_light"), (True, "_dark")]:
             alt.theme.options["darkmode"] = mode
+            # _resolve() re-calls chart() here so darkmode-sensitive colours are baked correctly
             svg_path = str(base.parent / f"{base.name}{suffix}.svg")
-            chart.save(svg_path)
+            _resolve().save(svg_path)
             _fix_tick_alignment(
                 svg_path,
                 band_padding=alt.theme.options.get("bandPadding", 0.1),

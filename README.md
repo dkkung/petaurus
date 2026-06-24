@@ -312,6 +312,57 @@ theme.pvalue_layers(..., pvalues=[0.002, 0.031])
 
 ---
 
+## Grid labels
+
+`add_grid_labels()` attaches a condition table directly below a chart, replacing its x-axis labels. `add_grid_labels_detached()` returns the table as a standalone layer for manual composition with `alt.vconcat`.
+
+```python
+CONDITIONS = {
+    "Condition 1": ["+", "-", "+", "+"],
+    "Condition 2": ["-", "-", "+", "-"],
+    "Condition 3": ["-", "-", "-", "+"],
+}
+
+# attached — x-axis labels replaced by the table
+theme.add_grid_labels(chart, CONDITIONS, categories=CATEGORIES, style="plusminus")
+
+# detached — compose manually
+alt.vconcat(
+    chart,
+    theme.add_grid_labels_detached(CONDITIONS, categories=CATEGORIES, style="dot"),
+).resolve_scale(x="shared")
+```
+
+Three `style` options are available: `"plusminus"` renders `+` / `−` symbols, `"dot"` renders filled and unfilled circles with an optional connecting rule, and `"text"` renders arbitrary strings (e.g. numeric scores) centered under each category.
+
+![Grid labels example](https://raw.githubusercontent.com/dkkung/dysonsphere/main/docs/grid_labels_example_light.png)
+
+| Parameter | Default | Description |
+|---|---|---|
+| `groups` | required | `{row_label: [value, ...]}` — one value per category |
+| `categories` | required | Ordered list of x-axis categories matching the main chart |
+| `style` | `"plusminus"` | `"plusminus"`, `"dot"`, or `"text"` |
+| `label_align` | `"right"` | `"right"` places row labels right of the grid; `"left"` places them left |
+| `label_padding` | `0` | Gap in pixels between the plot boundary and the label text |
+| `order` | insertion order | Top-to-bottom row order |
+| `row_height` | `14` | Height in pixels per row |
+| `connecting_line` | `True` | Draw a rule spanning the first to last `"+"` per row (`"dot"` style only) |
+| `dot_size` | `markSize × 4` | Dot area in square pixels (`"dot"` style only) |
+| `strokeWidth` | `markStrokeWidth` | Stroke width for dots and connecting rule |
+| `y_padding` | `0.1` | Inner padding between rows as a fraction of band step |
+| `chartWidth` | theme default | Width of the annotation chart in pixels |
+| `fontSize` | theme default | Font size for symbols and row labels |
+
+> **Dark mode:** `"dot"` style resolves fill colours from `theme.options()` at construction time. Pass a callable to `theme.save()` so the chart rebuilds after each darkmode toggle:
+> ```python
+> theme.save(
+>     lambda: theme.add_grid_labels(chart, CONDITIONS, style="dot", ...),
+>     "my_plot",
+> )
+> ```
+
+---
+
 ## Custom marks
 
 ### dysonsphere.mark_violin()

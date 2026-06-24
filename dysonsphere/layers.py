@@ -749,3 +749,338 @@ def pvalue_layers(
         )
 
     return alt.layer(*layer_charts)
+
+
+def add_grid_labels_detached(
+    groups: dict[str, list[str]],
+    categories: list[str],
+    *,
+    order: list[str] | None = None,
+    style: str = "plusminus",
+    label_align: str = "right",
+    label_padding: int = 0,
+    dot_size: int | None = None,
+    strokeWidth: float | None = None,
+    connecting_line: bool = True,
+    y_padding: float | None = None,
+    chartWidth: int | None = None,
+    fontSize: int | None = None,
+    row_height: int = 14,
+) -> alt.LayerChart:
+    """
+    Build a condition-table annotation chart to place below a strip/violin/boxplot.
+
+    Each key in ``groups`` is a row label; its value is a list of ``"+"`` or ``"-"``
+    strings, one per category (in the same order as ``categories``). Combine with the
+    main chart using ``alt.vconcat(chart, add_grid_labels_detached(...)).resolve_scale(x="shared")``.
+
+    Parameters
+    ----------
+    groups:
+        Mapping of row-label → list of ``"+"`` / ``"-"`` values. Length of each list
+        must equal ``len(categories)``.
+    categories:
+        Ordered list of x-axis categories — the same list passed to ``mark_strip``
+        or ``mark_violin``.
+    order:
+        Row display order (top to bottom). Defaults to ``dict`` insertion order.
+    style:
+        ``"plusminus"`` renders literal ``+`` / ``−`` characters. ``"dot"`` renders
+        filled circles — black for ``"+"`` and ``greys[0]`` for ``"-"`` — with a
+        horizontal line connecting the leftmost to rightmost ``"+"`` in each row.
+        ``"text"`` renders the raw values from the ``groups`` dict as center-aligned
+        text, suitable for arbitrary labels.
+    label_align:
+        ``"right"`` (default) places row labels to the right of the grid with
+        left-aligned text. ``"left"`` places them to the left with right-aligned text.
+    label_padding:
+        Gap in pixels between the plot boundary and the label text. Vega-Lite's
+        default is 2. Negative values pull the labels into the plot area.
+    dot_size:
+        Area (in square pixels) of each dot in ``"dot"`` style. Defaults to
+        ``markSize * 4`` from ``theme.options()``.
+    strokeWidth:
+        Stroke width applied to dot marks and the connecting rule. Defaults
+        to ``markStrokeWidth`` from ``theme.options()``.
+    connecting_line:
+        When ``True`` (default), draws a horizontal rule spanning the
+        leftmost to rightmost ``"+"`` in each row. Set to ``False`` to show
+        dots only.
+    y_padding:
+        Inner padding between rows as a fraction of the band step (0–1).
+        ``0`` means no gap; ``1`` means bands collapse to zero width.
+        Defaults to Vega-Lite's band scale default of ``0.1``.
+    chartWidth:
+        Width of the annotation chart in pixels. Inherits ``chartWidth`` from
+        ``theme.options()`` when not set.
+    fontSize:
+        Font size for ``"text"`` style symbols and row labels. Inherits ``fontSize``
+        from ``theme.options()`` when not set.
+    row_height:
+        Height in pixels per annotation row.
+
+    Notes
+    -----
+    **Row label alignment.** Row labels are rendered as explicit ``mark_text`` marks
+    (not as y-axis labels) so they share the exact same y coordinate as the content
+    marks. Vega-Lite's axis label rendering pipeline does not guarantee pixel-perfect
+    alignment with ``mark_text`` even when both use ``baseline="middle"``, so the y
+    axis is suppressed and labels are placed via ``alt.value(x)`` instead.
+
+    **``bandPosition=0.5``** is set explicitly on the shared ``y_enc`` rather than
+    relying on each mark type's default, which differs across mark types and may
+    change between Vega-Lite versions.
+
+    **``align="center"``** is required on all ``mark_text`` content marks. Without it,
+    Vega-Lite's vertical band placement drifts relative to other marks on some versions.
+
+    **Darkmode dot colours** (``positive_color``, ``negative_fill``, ``negative_stroke``)
+    are resolved from ``alt.theme.options`` at call time. When using ``style="dot"``
+    with ``theme.save()``, pass a callable so the chart is rebuilt after each darkmode
+    toggle::
+
+        theme.save(
+            lambda: theme.add_grid_labels(chart, groups, style="dot", ...),
+            "my_plot",
+        )
+
+    **hconcat label overflow.** Row label marks are positioned outside the declared
+    ``width`` (at ``x < 0`` or ``x > chartWidth``). Vega-Lite does not clip them by
+    default and does not reserve space for them in auto-layout. In an ``hconcat``,
+    labels from one panel can bleed into adjacent panels; add explicit ``spacing``
+    or outer padding to compensate.
+
+    Examples
+    --------
+    ::
+
+        CATEGORIES = ["Ctrl", "Drug A", "Drug B", "Drug C"]
+        theme.options(chartWidth=300)
+        chart = theme.mark_strip(df, "group", "value", CATEGORIES)
+        ann = theme.add_grid_labels_detached(
+            {
+                "dTAG^V-1":       ["-", "+", "+", "+"],
+                "ZFC3H1 WT":      ["-", "-", "+", "-"],
+                "ZFC3H1(Δ730–747)": ["-", "-", "-", "+"],
+            },
+            categories=CATEGORIES,
+            style="dot",
+        )
+        alt.vconcat(chart, ann).resolve_scale(x="shared")
+    """
+    from .palettes import colors
+
+    row_order = order if order is not None else list(groups.keys())
+
+    for label in row_order:
+        if len(groups[label]) != len(categories):
+            raise ValueError(
+                f"groups[{label!r}] has {len(groups[label])} values but "
+                f"len(categories) = {len(categories)}"
+            )
+
+    if style not in ("plusminus", "text", "dot"):
+        raise ValueError(f"style must be 'plusminus', 'text', or 'dot', got {style!r}")
+    if label_align not in ("left", "right"):
+        raise ValueError(f"label_align must be 'left' or 'right', got {label_align!r}")
+
+    if chartWidth is None:
+        chartWidth = alt.theme.options.get("chartWidth", 400)
+    if fontSize is None:
+        fontSize = alt.theme.options.get("fontSize", 7)
+
+    rows = [
+        {"__label": label, "__category": cat, "__value": val}
+        for label in row_order
+        for cat, val in zip(categories, groups[label])
+    ]
+    marks_df = pl.DataFrame(rows)
+
+    chart_h = len(row_order) * row_height
+
+    x_enc = alt.X(
+        "__category:N",
+        sort=categories,
+        axis=alt.Axis(labels=False, ticks=False, domain=False, title=None),
+    )
+    y_scale = alt.Scale(paddingInner=y_padding) if y_padding is not None else alt.Undefined
+    # Axis suppressed; row labels are explicit mark_text in row_labels layer below.
+    # bandPosition=0.5 is explicit because per-mark defaults vary across mark types.
+    y_enc = alt.Y(
+        "__label:N",
+        sort=row_order,
+        bandPosition=0.5,
+        scale=y_scale,
+        axis=alt.Axis(labels=False, ticks=False, domain=False, title=None),
+    )
+
+    label_x = alt.value(chartWidth + label_padding) if label_align == "right" else alt.value(-label_padding)
+    label_text_align = "left" if label_align == "right" else "right"
+    label_df = pl.DataFrame({"__label": row_order})
+    row_labels = (
+        alt.Chart(label_df)
+        .mark_text(fontSize=fontSize, align=label_text_align, baseline="middle")
+        .encode(x=label_x, y=y_enc, text=alt.Text("__label:N"))
+    )
+
+    if style == "plusminus":
+        text_df = marks_df.with_columns(
+            pl.col("__value").replace({"-": "−"})
+        )
+        # align="center" is required — without it Vega-Lite's vertical band
+        # placement drifts relative to other marks on some versions.
+        layer = (
+            alt.Chart(text_df)
+            .mark_text(fontSize=fontSize, align="center", baseline="middle")
+            .encode(x=x_enc, y=y_enc, text=alt.Text("__value:N"))
+        )
+        return alt.layer(row_labels, layer).properties(width=chartWidth, height=chart_h)
+
+    if style == "text":
+        layer = (
+            alt.Chart(marks_df)
+            .mark_text(fontSize=fontSize, align="center", baseline="middle")
+            .encode(x=x_enc, y=y_enc, text=alt.Text("__value:N"))
+        )
+        return alt.layer(row_labels, layer).properties(width=chartWidth, height=chart_h)
+
+    # --- dot style ---
+    # Colours are resolved at call time from alt.theme.options so that darkmode
+    # variants are correct. Use a callable with theme.save() to rebuild per variant.
+    darkmode = alt.theme.options.get("darkmode", False)
+    if darkmode:
+        positive_color = "white"
+        negative_fill = colors["greys"][6]
+        negative_stroke = "white"
+    else:
+        positive_color = "black"
+        negative_fill = colors["greys"][0]
+        negative_stroke = alt.Undefined
+
+    if dot_size is None:
+        dot_size = alt.theme.options.get("markSize", 10) * 4
+    if strokeWidth is None:
+        strokeWidth = alt.theme.options.get("markStrokeWidth", 0.25)
+
+    plus_df = marks_df.filter(pl.col("__value") == "+")
+    minus_df = marks_df.filter(pl.col("__value") == "-")
+
+    positive = (
+        alt.Chart(plus_df)
+        .mark_point(filled=True, color=positive_color, strokeWidth=0, size=dot_size)
+        .encode(x=x_enc, y=y_enc)
+    )
+    negative = (
+        alt.Chart(minus_df)
+        .mark_point(
+            filled=True,
+            fill=negative_fill,
+            stroke=negative_stroke,
+            strokeWidth=strokeWidth,
+            size=dot_size,
+        )
+        .encode(x=x_enc, y=y_enc)
+    )
+
+    line_rows = []
+    for label in row_order:
+        plus_idxs = [i for i, v in enumerate(groups[label]) if v == "+"]
+        if len(plus_idxs) >= 2:
+            line_rows.append(
+                {
+                    "__label": label,
+                    "__x_start": categories[plus_idxs[0]],
+                    "__x_end": categories[plus_idxs[-1]],
+                }
+            )
+
+    if connecting_line and line_rows:
+        lines_df = pl.DataFrame(line_rows)
+        lines = (
+            alt.Chart(lines_df)
+            # strokeDash=[0, 0] overrides the theme's dashedRule=True default.
+            .mark_rule(color=positive_color, strokeWidth=strokeWidth, strokeDash=[0, 0])
+            .encode(
+                x=alt.X("__x_start:N", sort=categories),
+                x2="__x_end:N",
+                y=y_enc,
+            )
+        )
+        chart = alt.layer(row_labels, lines, negative, positive)
+    else:
+        chart = alt.layer(row_labels, negative, positive)
+
+    return chart.properties(width=chartWidth, height=chart_h)
+
+
+def add_grid_labels(
+    chart: alt.Chart,
+    groups: dict[str, list[str]],
+    categories: list[str],
+    *,
+    spacing: int = 0,
+    **kwargs,
+) -> alt.VConcatChart:
+    """
+    Compose a chart with a grid annotation table, replacing its x-axis labels.
+
+    Strips x-axis labels and ticks from ``chart``, builds a :func:`add_grid_labels_detached`
+    layer, and returns ``alt.vconcat(chart, annotation, spacing=spacing).resolve_scale(x="shared")``.
+
+    All keyword arguments beyond ``spacing`` are forwarded to :func:`add_grid_labels_detached`.
+
+    Parameters
+    ----------
+    chart:
+        The main Altair chart (any type: ``Chart``, ``LayerChart``, etc.).
+    groups:
+        Passed to :func:`add_grid_labels_detached`.
+    categories:
+        Passed to :func:`add_grid_labels_detached`.
+    spacing:
+        Vertical gap in pixels between the chart and the annotation table.
+        Defaults to 0 so the annotation sits flush below the axis line.
+
+    Examples
+    --------
+    ::
+
+        chart = theme.mark_strip(df, "group", "value", CATEGORIES)
+        composed = theme.add_grid_labels(
+            chart,
+            {"dTAG^V-1": ["-", "+", "+", "+"], "ZFC3H1 WT": ["-", "-", "+", "-"]},
+            categories=CATEGORIES,
+            style="dot",
+            label_align="right",
+        )
+        theme.save(composed, "my_plot")
+    """
+    import copy
+
+    modified = copy.deepcopy(chart)
+
+    def _strip_x_labels(node: alt.SchemaBase) -> None:
+        # _kwds is used directly because `.axis` on alt.X returns a _PropertySetter
+        # descriptor, not the stored value — reading it would not give the Axis object.
+        if isinstance(node, alt.Chart):
+            enc = node._kwds.get("encoding", alt.Undefined)
+            if enc is not alt.Undefined:
+                x = enc._kwds.get("x", alt.Undefined)
+                if x is not alt.Undefined and isinstance(x, alt.X):
+                    axis = x._kwds.get("axis", alt.Undefined)
+                    if axis is alt.Undefined or axis is None:
+                        x._kwds["axis"] = alt.Axis(labels=False)
+                    elif isinstance(axis, alt.Axis):
+                        axis._kwds["labels"] = False
+        if isinstance(node, alt.LayerChart):
+            for layer in node._kwds.get("layer", []):
+                _strip_x_labels(layer)
+        if hasattr(node, "_kwds"):
+            for sub in node._kwds.get("vconcat", []):
+                _strip_x_labels(sub)
+            for sub in node._kwds.get("hconcat", []):
+                _strip_x_labels(sub)
+
+    _strip_x_labels(modified)
+    ann = add_grid_labels_detached(groups, categories, **kwargs)
+    return alt.vconcat(modified, ann, spacing=spacing).resolve_scale(x="shared")
