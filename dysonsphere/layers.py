@@ -1,14 +1,17 @@
+from typing import Any
+
 import altair as alt
 import numpy as np
 import polars as pl
 
 from .transforms import add_beeswarm, add_jitter
+from .utils import ensure_polars
 
 _UNSET = object()
 
 
 def mark_violin(
-    df: pl.DataFrame,
+    df: pl.DataFrame | Any,
     x_col: str,
     y_col: str,
     categories: list[str],
@@ -78,6 +81,7 @@ def mark_violin(
     """
     from scipy.stats import gaussian_kde
 
+    df = ensure_polars(df)
     if fillOpacity is None:
         fillOpacity = alt.theme.options.get("markFillOpacity", 1.0)
     if strokeWidth is None:
@@ -176,7 +180,7 @@ def mark_violin(
 
 
 def mark_strip(
-    df: pl.DataFrame,
+    df: pl.DataFrame | Any,
     x_col: str,
     y_col: str,
     categories: list[str],
@@ -238,6 +242,7 @@ def mark_strip(
         # beeswarm variant
         chart = ds.mark_strip(df, "group", "value", CATEGORIES, scatter="beeswarm")
     """
+    df = ensure_polars(df)
     if point_size is None:
         point_size = alt.theme.options.get("markSize", 10)
     if point_opacity is None:
@@ -482,7 +487,7 @@ def _pvalue_layer(
 
 
 def add_pvalue(
-    df: pl.DataFrame,
+    df: pl.DataFrame | Any,
     x_col: str,
     y_col: str,
     pairs: list[tuple[str, str]],
@@ -611,6 +616,7 @@ def add_pvalue(
     """
     from scipy import stats as _stats
 
+    df = ensure_polars(df)
     if not pairs:
         raise ValueError("pairs must not be empty")
 

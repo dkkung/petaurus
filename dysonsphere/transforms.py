@@ -1,6 +1,10 @@
+from typing import Any
+
 import altair as alt
 import numpy as np
 import polars as pl
+
+from .utils import ensure_polars
 
 
 def beeswarm_offsets(
@@ -119,7 +123,7 @@ def beeswarm_offsets(
 
 
 def add_beeswarm(
-    df: pl.DataFrame,
+    df: pl.DataFrame | Any,
     y_col: str,
     group_by: list[str],
     height_px: int | None = None,
@@ -169,6 +173,7 @@ def add_beeswarm(
             xOffset=alt.XOffset("beeswarm_x:Q"),
         )
     """
+    df = ensure_polars(df)
     return (
         df.with_row_index("__beeswarm_idx")
         .group_by(group_by)
@@ -190,7 +195,7 @@ def add_beeswarm(
 
 
 def add_jitter(
-    df: pl.DataFrame,
+    df: pl.DataFrame | Any,
     spread: float | None = None,
     out_col: str = "jitter_x",
     seed: int | None = 2022_07_01,
@@ -232,6 +237,7 @@ def add_jitter(
             xOffset=alt.XOffset("jitter_x:Q"),
         )
     """
+    df = ensure_polars(df)
     if spread is None:
         spread = 2.0
     rng = np.random.default_rng(seed)

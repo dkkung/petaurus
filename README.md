@@ -18,6 +18,8 @@ pip install dysonsphere
 
 Requires Python 3.11+. Dependencies: `altair`, `numpy`, `polars`, `scipy`.
 
+All functions that accept a DataFrame support both **Polars** and **pandas** DataFrames. A pandas DataFrame is automatically converted to Polars at the boundary via `ds.ensure_polars()`. Pandas is not a declared dependency — it only needs to be installed if you actually pass one in. Note that `pandas` with string/object columns additionally requires `pyarrow` for the conversion (a Polars requirement, not dysonsphere's).
+
 ---
 
 ## Quick start
@@ -281,7 +283,7 @@ ds.add_pvalue(..., pvalues=[0.002, 0.031])
 
 | Parameter | Default | Description |
 |---|---|---|
-| `df` | required | Polars DataFrame |
+| `df` | required | Polars or pandas DataFrame |
 | `x_col`, `y_col` | required | Column names for groups and values |
 | `pairs` | required | List of `(group1, group2)` tuples to annotate |
 | `test` | `"mannwhitneyu"` | Statistical test: `"mannwhitneyu"`, `"ttest_ind"`, `"ttest_rel"`, `"wilcoxon"`, `"tukey_hsd"` |
@@ -372,7 +374,7 @@ ds.save(chart, "violin")
 
 | Parameter | Default | Description |
 |---|---|---|
-| `df` | required | Polars DataFrame |
+| `df` | required | Polars or pandas DataFrame |
 | `x_col` | required | Grouping column name |
 | `y_col` | required | Value column name |
 | `categories` | required | Ordered list of group labels |

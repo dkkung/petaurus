@@ -1,0 +1,35 @@
+import polars as pl
+
+
+def ensure_polars(df: pl.DataFrame) -> pl.DataFrame:
+    """
+    Convert a pandas DataFrame to Polars, or pass a Polars DataFrame through unchanged.
+
+    Accepts either a ``polars.DataFrame`` or a ``pandas.DataFrame`` without
+    requiring pandas as a hard dependency — the check is done via the module
+    name only.  If ``df`` is neither, a ``TypeError`` is raised.
+
+    Parameters
+    ----------
+    df:
+        A ``polars.DataFrame`` or ``pandas.DataFrame``.
+
+    Returns
+    -------
+    polars.DataFrame
+        The original DataFrame if already Polars, otherwise the result of
+        ``polars.from_pandas(df)``.
+
+    Examples
+    --------
+    ::
+
+        import pandas as pd
+        pdf = pd.DataFrame({"group": ["A", "B"], "value": [1.0, 2.0]})
+        pldf = ds.ensure_polars(pdf)  # returns a polars.DataFrame
+    """
+    if isinstance(df, pl.DataFrame):
+        return df
+    if type(df).__module__.startswith("pandas"):
+        return pl.from_pandas(df)
+    raise TypeError(f"Expected a polars.DataFrame or pandas.DataFrame, got {type(df).__name__}.")
