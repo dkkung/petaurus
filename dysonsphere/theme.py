@@ -22,6 +22,7 @@ def theme(
     chartHeight=100,
     chartWidth=100,
     darkmode=False,
+    dashedGrid=False,
     dashedLine=False,
     dashedRule=True,
     dashedWidth=[2, 2],
@@ -75,6 +76,7 @@ def theme(
     alt.theme.options["chartHeight"] = chartHeight
     alt.theme.options["chartWidth"] = chartWidth
     alt.theme.options["darkmode"] = darkmode
+    alt.theme.options["dashedGrid"] = dashedGrid
     alt.theme.options["dashedLine"] = dashedLine
     alt.theme.options["dashedRule"] = dashedRule
     alt.theme.options["dashedWidth"] = dashedWidth
@@ -140,6 +142,7 @@ def custom():
                 "grid": opts["grid"],
                 "gridCap": opts["strokeCap"],
                 "gridColor": (opts["gridColor"] if opts["darkmode"] else opts["gridColor"]),
+                "gridDash": opts["dashedWidth"] if opts["dashedGrid"] else [0, 0],
                 "gridOpacity": 1.00,
                 "gridWidth": opts["axisWidth"],
                 "labelColor": "white" if opts["darkmode"] else "black",
