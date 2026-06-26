@@ -159,7 +159,7 @@ See the [palette gallery](https://dkkung.github.io/dysonsphere/) for a visual ov
 `blues`, `greens`, `purples`, `lavenders`, `violets`, `greys`, `reds`, `rose`, `oranges`, `browns`, `yellows`, `cyans`, `magentas`, `neongreens`
 
 **Sequential — Single-hue 2** (12 stops, deeper saturation built with Oklab arc-length resampling):
-`blues2`, `greens2`, `purples2`, `lavenders2`, `violets2`, `greys2`, `reds2`, `roses2`, `oranges2`, `browns2`, `yellows2`, `cyans2`, `magentas2`, `neongreens2`
+`blues2`, `greens2`, `purples2`, `lavenders2`, `violets2`, `greys2`, `reds2`, `pinks2`, `oranges2`, `browns2`, `yellows2`, `cyans2`, `magentas2`, `neongreens2`
 
 **Sequential — Multi-hue** (12 stops, two or more hues blended in Oklab):
 `yellowgreen`, `ember`, `dusk`, `shoal`, `moss`, `GnBu`, `YlGnBu`, `candy`, `lagoon`, `bluestlagoon`, `bluerlagoon`, `bluelagoon`
@@ -168,7 +168,10 @@ See the [palette gallery](https://dkkung.github.io/dysonsphere/) for a visual ov
 `RdBu`, `RdYlBu`, `PuGn`, `MgGn`, `PkTe`, `GdBu`, `BrTe`, `BrGn`
 
 **Diverging — Sequential pairs** (13 stops, one sequential hue per arm):
-`greensblues`, `redsblues`, `redsgreens`, `redscyans`, `redslavenders`, `redsviolets`, `redsneongreens`, `rosesblues`, `rosescyans`, `rosesgreens`, `rosesneongreens`, `orangesblues`, `orangescyans`, `orangespurples`, `orangeslavenders`, `orangesviolets`, `orangesneongreens`, `yellowsblues`, `yellowspurples`, `yellowslavenders`, `brownsblues`, `brownsgreens`, `brownscyans`, `brownsneongreens`, `magentasneongreens`, `magentasgreens`, `magentasblues`, `magentascyans`, `violetsoranges`, `violetsyellows`, `purplesgreens`, `purplesblues`, `purplesneongreens`, `lavendersgreens`, `lavendersblues`, `lavendersneongreens`, `cyanspurples`, `cyanslavenders`, `cyansviolets`, `greysblues`, `greysreds`, `greysgreens`, `greyscyans`, `greysyellows`, `greysoranges`, `greysmagentas`, `greysviolets`, `greysneongreens`, `greyspurples`, `greyslavender`, `greysrose`
+`greensblues`, `redsblues`, `redsgreens`, `redscyans`, `redslavenders`, `redsviolets`, `redsneongreens`, `pinksblues`, `pinkscyans`, `pinksgreens`, `pinksneongreens`, `orangesblues`, `orangescyans`, `orangespurples`, `orangeslavenders`, `orangesviolets`, `orangesneongreens`, `yellowsblues`, `yellowspurples`, `yellowslavenders`, `brownsblues`, `brownsgreens`, `brownscyans`, `brownsneongreens`, `magentasneongreens`, `magentasgreens`, `magentasblues`, `magentascyans`, `violetsoranges`, `violetsyellows`, `purplesgreens`, `purplesblues`, `purplesneongreens`, `lavendersgreens`, `lavendersblues`, `lavendersneongreens`, `cyanspurples`, `cyanslavenders`, `cyansviolets`, `greysblues`, `greysreds`, `greysgreens`, `greyscyans`, `greysyellows`, `greysoranges`, `greysmagentas`, `greysviolets`, `greysneongreens`, `greyspurples`, `greyslavender`, `greyspinks`
+
+**Diverging — Sequential pairs 2** (13 stops, one deeper-saturation `2` sequential hue per arm):
+`greensblues2`, `redsblues2`, `redsgreens2`, `redscyans2`, `redslavenders2`, `redsviolets2`, `redsneongreens2`, `pinksblues2`, `pinkscyans2`, `pinksgreens2`, `pinksneongreens2`, `orangesblues2`, `orangescyans2`, `orangespurples2`, `orangeslavenders2`, `orangesviolets2`, `orangesneongreens2`, `yellowsblues2`, `yellowspurples2`, `yellowslavenders2`, `brownsblues2`, `brownsgreens2`, `brownscyans2`, `brownsneongreens2`, `magentasneongreens2`, `magentasgreens2`, `magentasblues2`, `magentascyans2`, `violetsoranges2`, `violetsyellows2`, `purplesgreens2`, `purplesblues2`, `purplesneongreens2`, `lavendersgreens2`, `lavendersblues2`, `lavendersneongreens2`, `cyanspurples2`, `cyanslavenders2`, `cyansviolets2`, `greysblues2`, `greysreds2`, `greysgreens2`, `greyscyans2`, `greysyellows2`, `greysoranges2`, `greysmagentas2`, `greysviolets2`, `greysneongreens2`, `greyspurples2`, `greyslavenders2`, `greyspinks2`
 
 **Discrete:**
 `nucleotides` (5 colors: A, T, G, C, U), `proteins` (8 biochemical groups: hydrophobic, aromatic, positive, negative, polar, proline, glycine, cysteine)
@@ -193,7 +196,7 @@ ds.save(chart, "plots/myplot")
 Produces light and dark PNG and SVG files from a single call. SVG output is post-processed to flatten Vega's redundant `<g>` wrappers, making it easier to navigate in Illustrator. A Vega-Lite JSON spec is also saved by default for full reproducibility.
 
 ```python
-ds.save(chart, "myplot", ppi=1200)                    # default PPI; reduce for faster exports
+ds.save(chart, "myplot", ppi=1200)                     # default PPI; reduce for faster exports
 ds.save(chart, "myplot", saveVegaSpec=False)           # skip the JSON spec
 ds.save(chart, "myplot", description="Figure 1")       # embed a description in the SVG
 ds.save(chart, "myplot", background=["light"])         # light variant only
