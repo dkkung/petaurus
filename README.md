@@ -83,7 +83,7 @@ ds.theme(   # custom configuration
 | `fontSize` | `7` | Font size in points |
 | `fontWeight` | `400` | Font weight: 300 = light, 400 = normal, 700 = bold |
 | `grid` | `False` | Show axis grid lines |
-| `gridColor` | `"darkGray"` | Grid line color |
+| `gridColor` | `colors["greys"][0]` | Grid line color |
 | `legend` | `True` | Show legends |
 | `legendOffset` | `tickSize` | Distance between legend and chart edge |
 | `legendStroke` | `False` | Draw a border around the legend box |
@@ -275,8 +275,7 @@ From pre-computed p-values, with explicit bracket positions:
 ```python
 ds.add_pvalue(..., pvalues=[0.002, 0.031], yPositions=[4.5, 5.2])
 ```
-
-**Parameters**
+![p-value example](https://raw.githubusercontent.com/dkkung/dysonsphere/main/docs/pvalue_example_light.png)
 
 | Parameter | Default | Description |
 |---|---|---|
@@ -299,7 +298,6 @@ ds.add_pvalue(..., pvalues=[0.002, 0.031], yPositions=[4.5, 5.2])
 | `chartWidth` | `theme(chartWidth)` | Chart width for computing text x position; auto-read from the active theme, rarely needs to be set explicitly |
 | `decimals` | `3` | Decimal places in the p-value label (only for `labelStyle="p"`) |
 
-![p-value example](https://raw.githubusercontent.com/dkkung/dysonsphere/main/docs/pvalue_example_light.png)
 
 ---
 
@@ -415,10 +413,10 @@ chart = ds.mark_strip(df, "group", "value", CATEGORIES, scatter="beeswarm")
 
 ```sh
 # uv
-uv run python scripts/build/build_palettes.py
+uv run scripts/build/build_palettes.py
 
 # pip
-python scripts/build/build_palettes.py
+python3 scripts/build/build_palettes.py
 ```
 
 The four recipes are:
@@ -434,10 +432,10 @@ Palette hex values live in `dysonsphere/palettes.py` as plain lists — no color
 
 ```sh
 # uv
-uv run python scripts/build/build_gallery.py
+uv run scripts/build/build_gallery.py
 
 # pip
-python scripts/build/build_gallery.py
+python3 scripts/build/build_gallery.py
 ```
 
 Writes `docs/index.html`. Open in a browser to browse all palettes across 11 chart types.
@@ -446,10 +444,10 @@ Writes `docs/index.html`. Open in a browser to browse all palettes across 11 cha
 
 ```sh
 # uv
-uv run python scripts/build/build_swatches_for_illustrator.py
+uv run scripts/build/build_swatches_for_illustrator.py
 
 # pip
-python scripts/build/build_swatches_for_illustrator.py
+python3 scripts/build/build_swatches_for_illustrator.py
 ```
 
 Generates `scripts/import_palettes_to_illustrator.jsx`. To import into Illustrator:

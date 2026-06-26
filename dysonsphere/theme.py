@@ -30,7 +30,7 @@ def theme(
     fontStyle="normal",
     fontWeight=400,  # only multiples of 100; 300 = light, 400 = normal/regular; 700 = bold
     grid=False,
-    gridColor="darkGray",
+    gridColor=colors["greys"][0],
     legend=True,
     legendOffset=None,  # defaults to tickSize if not set
     legendStroke=False,
@@ -140,7 +140,7 @@ def custom():
                 "grid": opts["grid"],
                 "gridCap": opts["strokeCap"],
                 "gridColor": (opts["gridColor"] if opts["darkmode"] else opts["gridColor"]),
-                "gridOpacity": 0.25,
+                "gridOpacity": 1.00,
                 "gridWidth": opts["axisWidth"],
                 "labelColor": "white" if opts["darkmode"] else "black",
                 "labelFont": opts["font"],
