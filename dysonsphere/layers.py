@@ -330,6 +330,7 @@ def add_multilabel_detached(
     *,
     order: list[str] | None = None,
     style: str = "plusminus",
+    rowStyles: dict[str, str] | None = None,
     labelAlign: str = "left",
     labelPadding: int = 0,
     symbol: str = "circle",
@@ -341,7 +342,7 @@ def add_multilabel_detached(
     yPadding: float | None = None,
     chartWidth: int | None = None,
     fontSize: int | None = None,
-    rowHeight: int = 14,
+    rowHeight: int | float | None = None,
 ) -> alt.LayerChart:
     """
     Build a condition-table annotation chart to place below a strip/violin/boxplot.
@@ -369,12 +370,18 @@ def add_multilabel_detached(
     order:
         Row display order (top to bottom). Defaults to ``dict`` insertion order.
     style:
-        ``"plusminus"`` renders ``True`` as ``+`` and ``False`` as ``−``.
-        ``"symbol"`` renders ``True`` as a filled mark and ``False`` as an unfilled
-        mark, with a connecting rule between consecutive ``True`` values (direction
-        set by ``orientation``). The mark shape is controlled by ``symbol``. ``"text"`` renders raw
-        group values as center-aligned strings and is forced automatically when any
-        value is non-bool.
+        Global default style for all rows. ``"plusminus"`` renders ``True`` as ``+``
+        and ``False`` as ``−``. ``"symbol"`` renders ``True`` as a filled mark and
+        ``False`` as an unfilled mark, with a connecting rule between consecutive
+        ``True`` values (direction set by ``orientation``). The mark shape is
+        controlled by ``symbol``. ``"text"`` renders raw group values as
+        center-aligned strings and is forced automatically per row when any value in
+        that row is non-bool. Override per row with ``rowStyles``.
+    rowStyles:
+        Per-row style overrides as ``{row_label: style_string}``. Accepts the same
+        values as ``style``. Non-bool rows always render as ``"text"`` regardless of
+        this setting. Connecting rules only span between ``"symbol"`` rows; rows of
+        other styles between symbol rows are skipped in run detection.
     labelAlign:
         ``"left"`` (default) places row labels to the left of the grid with
         right-aligned text. ``"right"`` places them to the right with left-aligned text.
@@ -414,7 +421,7 @@ def add_multilabel_detached(
         Font size for ``"text"`` style symbols and row labels. Inherits ``fontSize``
         from ``ds.theme()`` when not set.
     rowHeight:
-        Height in pixels per annotation row.
+        Height in pixels per annotation row. Defaults to ``fontSize * 1.5``.
 
     Notes
     -----
@@ -477,21 +484,35 @@ def add_multilabel_detached(
                 f"in the same left-to-right order as the main chart."
             )
 
-    # Auto-detect style: any non-bool value forces text style.
-    # Must check isinstance(v, bool) before isinstance(v, int) because bool subclasses int.
-    all_values = [v for label in row_order for v in groups[label]]
-    if any(not isinstance(v, bool) for v in all_values):
-        style = "text"
-
     if style not in ("plusminus", "text", "symbol"):
         raise ValueError(f"style must be 'plusminus', 'text', or 'symbol', got {style!r}")
     if labelAlign not in ("left", "right"):
         raise ValueError(f"labelAlign must be 'left' or 'right', got {labelAlign!r}")
+    if orientation not in ("vertical", "horizontal"):
+        raise ValueError(f"orientation must be 'vertical' or 'horizontal', got {orientation!r}")
+
+    # Per-row style resolution: rowStyles overrides global style; non-bool values always
+    # force "text" regardless. Check isinstance(v, bool) before isinstance(v, int) because
+    # bool subclasses int.
+    def _row_style(label: str) -> str:
+        s = (rowStyles or {}).get(label, style)
+        if s not in ("plusminus", "text", "symbol"):
+            raise ValueError(f"rowStyles[{label!r}] must be 'plusminus', 'text', or 'symbol', got {s!r}")
+        if any(not isinstance(v, bool) for v in groups[label]):
+            return "text"
+        return s
+
+    row_styles = {label: _row_style(label) for label in row_order}
+    plusminus_rows = [l for l in row_order if row_styles[l] == "plusminus"]
+    text_rows = [l for l in row_order if row_styles[l] == "text"]
+    symbol_rows = [l for l in row_order if row_styles[l] == "symbol"]
 
     if chartWidth is None:
         chartWidth = alt.theme.options.get("chartWidth", 100)
     if fontSize is None:
         fontSize = alt.theme.options.get("fontSize", 7)
+    if rowHeight is None:
+        rowHeight = fontSize * 1.5
 
     def _norm(v: object) -> str:
         if isinstance(v, bool):
@@ -535,143 +556,157 @@ def add_multilabel_detached(
         .encode(x=label_x, y=y_enc, text=alt.Text("__label:N"))
     )
 
-    if style == "plusminus":
-        text_df = marks_df.with_columns(pl.col("__value").replace({"-": "−"}))
+    layers: list = [row_labels]
+
+    # --- plusminus rows ---
+    if plusminus_rows:
+        pm_df = marks_df.filter(pl.col("__label").is_in(plusminus_rows)).with_columns(
+            pl.col("__value").replace({"-": "−"})
+        )
         # align="center" is required — without it Vega-Lite's vertical band
         # placement drifts relative to other marks on some versions.
-        layer = (
+        layers.append(
+            alt.Chart(pm_df)
+            .mark_text(fontSize=fontSize, align="center", baseline="middle")
+            .encode(x=x_enc, y=y_enc, text=alt.Text("__value:N"))
+        )
+
+    # --- text rows ---
+    if text_rows:
+        text_df = marks_df.filter(pl.col("__label").is_in(text_rows))
+        layers.append(
             alt.Chart(text_df)
             .mark_text(fontSize=fontSize, align="center", baseline="middle")
             .encode(x=x_enc, y=y_enc, text=alt.Text("__value:N"))
         )
-        return alt.layer(row_labels, layer).properties(width=chartWidth, height=chart_h)
 
-    if style == "text":
-        layer = (
-            alt.Chart(marks_df)
-            .mark_text(fontSize=fontSize, align="center", baseline="middle")
-            .encode(x=x_enc, y=y_enc, text=alt.Text("__value:N"))
+    # --- symbol rows ---
+    if symbol_rows:
+        # Colours are resolved at call time from alt.theme.options so that darkmode
+        # variants are correct. Use a callable with ds.save() to rebuild per variant.
+        darkmode = alt.theme.options.get("darkmode", False)
+        if darkmode:
+            positive_color = "white"
+            negative_fill = colors["greys"][6]
+            negative_stroke = "white"
+        else:
+            positive_color = "black"
+            negative_fill = colors["greys"][0]
+            negative_stroke = alt.Undefined
+
+        if palette is not None:
+            negative_fill = palette[0]
+            positive_color = palette[-1]
+
+        if symbolSize is None:
+            symbolSize = alt.theme.options.get("markSize", 10) * 4
+        if strokeWidth is None:
+            strokeWidth = alt.theme.options.get("markStrokeWidth", 0.25)
+
+        plus_df = marks_df.filter(
+            pl.col("__label").is_in(symbol_rows) & (pl.col("__value") == "+")
         )
-        return alt.layer(row_labels, layer).properties(width=chartWidth, height=chart_h)
-
-    # --- symbol style ---
-    # Colours are resolved at call time from alt.theme.options so that darkmode
-    # variants are correct. Use a callable with ds.save() to rebuild per variant.
-    darkmode = alt.theme.options.get("darkmode", False)
-    if darkmode:
-        positive_color = "white"
-        negative_fill = colors["greys"][6]
-        negative_stroke = "white"
-    else:
-        positive_color = "black"
-        negative_fill = colors["greys"][0]
-        negative_stroke = alt.Undefined
-
-    if palette is not None:
-        negative_fill = palette[0]
-        positive_color = palette[-1]
-
-    if symbolSize is None:
-        symbolSize = alt.theme.options.get("markSize", 10) * 4
-    if strokeWidth is None:
-        strokeWidth = alt.theme.options.get("markStrokeWidth", 0.25)
-
-    plus_df = marks_df.filter(pl.col("__value") == "+")
-    minus_df = marks_df.filter(pl.col("__value") == "-")
-
-    symbol_dy = -fontSize * 0.1
-
-    positive = (
-        alt.Chart(plus_df)
-        .mark_point(
-            shape=symbol,
-            filled=True,
-            color=positive_color,
-            strokeWidth=strokeWidth,
-            size=symbolSize,
-            dy=symbol_dy,
+        minus_df = marks_df.filter(
+            pl.col("__label").is_in(symbol_rows) & (pl.col("__value") == "-")
         )
-        .encode(x=x_enc, y=y_enc)
-    )
-    negative = (
-        alt.Chart(minus_df)
-        .mark_point(
-            shape=symbol,
-            filled=True,
-            fill=negative_fill,
-            stroke=negative_stroke,
-            strokeWidth=strokeWidth,
-            size=symbolSize,
-            dy=symbol_dy,
+
+        symbol_dy = -fontSize * 0.1
+
+        positive = (
+            alt.Chart(plus_df)
+            .mark_point(
+                shape=symbol,
+                filled=True,
+                color=positive_color,
+                strokeWidth=strokeWidth,
+                size=symbolSize,
+                dy=symbol_dy,
+            )
+            .encode(x=x_enc, y=y_enc)
         )
-        .encode(x=x_enc, y=y_enc)
-    )
+        negative = (
+            alt.Chart(minus_df)
+            .mark_point(
+                shape=symbol,
+                filled=True,
+                fill=negative_fill,
+                stroke=negative_stroke,
+                strokeWidth=strokeWidth,
+                size=symbolSize,
+                dy=symbol_dy,
+            )
+            .encode(x=x_enc, y=y_enc)
+        )
 
-    if orientation not in ("vertical", "horizontal"):
-        raise ValueError(f"orientation must be 'vertical' or 'horizontal', got {orientation!r}")
-
-    line_rows = []
-    if orientation == "horizontal":
-        for label in row_order:
-            run: list[int] = []
-            for i, v in enumerate(groups[label]):
-                if v is True:
-                    run.append(i)
-                else:
-                    if len(run) >= 2:
-                        line_rows.append(
-                            {"__label": label, "__x_start": categories[run[0]], "__x_end": categories[run[-1]]}
-                        )
-                    run = []
-            if len(run) >= 2:
-                line_rows.append(
-                    {"__label": label, "__x_start": categories[run[0]], "__x_end": categories[run[-1]]}
-                )
-    else:  # vertical
-        for i, cat in enumerate(categories):
-            run = []
-            for j, label in enumerate(row_order):
-                if groups[label][i] is True:
-                    run.append(j)
-                else:
-                    if len(run) >= 2:
-                        line_rows.append(
-                            {"__category": cat, "__label": row_order[run[0]], "__label_end": row_order[run[-1]]}
-                        )
-                    run = []
-            if len(run) >= 2:
-                line_rows.append(
-                    {"__category": cat, "__label": row_order[run[0]], "__label_end": row_order[run[-1]]}
-                )
-
-    if connectingLine and line_rows:
-        lines_df = pl.DataFrame(line_rows)
+        # Connecting lines only span between symbol rows; non-symbol rows between
+        # two symbol rows are skipped in run detection (they don't break runs).
+        symbol_row_set = set(symbol_rows)
+        line_rows = []
         if orientation == "horizontal":
-            lines = (
-                alt.Chart(lines_df)
-                # strokeDash=[0, 0] overrides the theme's dashedRule=True default.
-                .mark_rule(strokeWidth=strokeWidth, strokeDash=[0, 0])
-                .encode(
-                    x=alt.X("__x_start:N", sort=categories),
-                    x2="__x_end:N",
-                    y=y_enc,
-                )
-            )
+            for label in row_order:
+                if label not in symbol_row_set:
+                    continue
+                run: list[int] = []
+                for i, v in enumerate(groups[label]):
+                    if v is True:
+                        run.append(i)
+                    else:
+                        if len(run) >= 2:
+                            line_rows.append(
+                                {"__label": label, "__x_start": categories[run[0]], "__x_end": categories[run[-1]]}
+                            )
+                        run = []
+                if len(run) >= 2:
+                    line_rows.append(
+                        {"__label": label, "__x_start": categories[run[0]], "__x_end": categories[run[-1]]}
+                    )
         else:  # vertical
-            lines = (
-                alt.Chart(lines_df)
-                .mark_rule(strokeWidth=strokeWidth, strokeDash=[0, 0])
-                .encode(
-                    x=x_enc,
-                    y=y_enc,
-                    y2="__label_end:N",
-                )
-            )
-        chart = alt.layer(row_labels, lines, negative, positive)
-    else:
-        chart = alt.layer(row_labels, negative, positive)
+            for i, cat in enumerate(categories):
+                run = []
+                for j, label in enumerate(row_order):
+                    if label not in symbol_row_set:
+                        continue
+                    if groups[label][i] is True:
+                        run.append(j)
+                    else:
+                        if len(run) >= 2:
+                            line_rows.append(
+                                {"__category": cat, "__label": row_order[run[0]], "__label_end": row_order[run[-1]]}
+                            )
+                        run = []
+                if len(run) >= 2:
+                    line_rows.append(
+                        {"__category": cat, "__label": row_order[run[0]], "__label_end": row_order[run[-1]]}
+                    )
 
-    return chart.properties(width=chartWidth, height=chart_h)
+        if connectingLine and line_rows:
+            lines_df = pl.DataFrame(line_rows)
+            if orientation == "horizontal":
+                lines = (
+                    alt.Chart(lines_df)
+                    # strokeDash=[0, 0] overrides the theme's dashedRule=True default.
+                    .mark_rule(strokeWidth=strokeWidth, strokeDash=[0, 0])
+                    .encode(
+                        x=alt.X("__x_start:N", sort=categories),
+                        x2="__x_end:N",
+                        y=y_enc,
+                    )
+                )
+            else:  # vertical
+                lines = (
+                    alt.Chart(lines_df)
+                    .mark_rule(strokeWidth=strokeWidth, strokeDash=[0, 0])
+                    .encode(
+                        x=x_enc,
+                        y=y_enc,
+                        y2="__label_end:N",
+                    )
+                )
+            layers.extend([lines, negative, positive])
+        else:
+            layers.extend([negative, positive])
+
+    return alt.layer(*layers).properties(width=chartWidth, height=chart_h)
 
 
 def add_multilabel(

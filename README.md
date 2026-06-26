@@ -325,7 +325,9 @@ alt.vconcat(
 ).resolve_scale(x="shared")
 ```
 
-`groups` values should be booleans: `True` for a positive mark, `False` for a negative mark. If any value is a non-bool (`str`, `int`, `float`), the style is automatically set to `"text"` and values are rendered verbatim — useful for numeric scores or arbitrary labels.
+`groups` values should be booleans: `True` for a positive mark, `False` for a negative mark. If any value in a row is a non-bool (`str`, `int`, `float`), that row is automatically rendered as `"text"` regardless of `style` or `rowStyles`.
+
+Rows can mix styles: set a global `style` and override individual rows with `rowStyles`. Connecting rules only span between `"symbol"` rows — rows of other styles between symbol rows are skipped in run detection without raising an error.
 
 Three `style` options are available: `"plusminus"` renders `True` as `+` and `False` as `−`, `"symbol"` renders `True` as a filled mark and `False` as an unfilled mark (shape set by the `symbol` parameter, default `"circle"`) with an optional connecting rule whose direction is controlled by `orientation`, and `"text"` renders raw values as strings centered under each category.
 
@@ -333,16 +335,17 @@ Three `style` options are available: `"plusminus"` renders `True` as `+` and `Fa
 
 | Parameter | Default | Description |
 |---|---|---|
-| `groups` | required | `{row_label: [bool, ...]}` — one `True`/`False` per category; non-bool values force `style="text"` |
+| `groups` | required | `{row_label: [bool, ...]}` — one `True`/`False` per category; non-bool values force `style="text"` for that row |
 | `categories` | required | Ordered list of x-axis categories matching the main chart |
-| `style` | `"plusminus"` | `"plusminus"`, `"symbol"`, or `"text"` (auto-set when values are non-bool) |
+| `style` | `"plusminus"` | Global default style: `"plusminus"`, `"symbol"`, or `"text"` (auto-set per row when values are non-bool) |
+| `rowStyles` | `None` | Per-row style overrides as `{row_label: style_string}`; accepts the same values as `style` |
 | `labelAlign` | `"left"` | `"left"` places row labels left of the multilabel grid; `"right"` places them right |
 | `labelPadding` | `0` | Gap in pixels between the plot boundary and the label text |
 | `order` | insertion order | Top-to-bottom row order |
-| `rowHeight` | `14` | Height in pixels per row |
+| `rowHeight` | `fontSize * 1.5` | Height in pixels per row |
 | `symbol` | `"circle"` | Vega-Lite shape name (`"square"`, `"diamond"`, `"triangle-up"`, etc.) (`"symbol"` style only) |
 | `symbolSize` | `theme(markSize) * 4` | Symbol area in square pixels (`"symbol"` style only) |
-| `connectingLine` | `True` | Draw a connecting rule between consecutive `True` values (`"symbol"` style only); direction set by `orientation` |
+| `connectingLine` | `True` | Draw a connecting rule between consecutive `True` values (`"symbol"` rows only); direction set by `orientation` |
 | `orientation` | `"vertical"` | `"vertical"` connects consecutive `True` rows within each column; `"horizontal"` connects consecutive `True` columns within each row (`"symbol"` style only) |
 | `strokeWidth` | `theme(markStrokeWidth)` | Stroke width for dots and connecting rule |
 | `yPadding` | `0.1` | Inner padding between rows as a fraction of band step |
