@@ -39,7 +39,7 @@ PAIRS = [("A", "B"), ("A", "C"), ("B", "C")]
 
 
 def build_pvalue_example():
-    ds.theme(palette="blues2", chartWidth=75, markSize=10, legend=False)
+    ds.theme(palette="blues2", chartWidth=75, markSize=13, legend=False)
 
     x = alt.X("group:N", sort=CATEGORIES, title=None)
 
