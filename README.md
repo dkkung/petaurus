@@ -16,9 +16,9 @@ uv pip install dysonsphere
 pip install dysonsphere
 ```
 
-Requires Python 3.11+. Dependencies: `altair`, `numpy`, `polars`, `scipy`.
+Requires Python 3.11+. Dependencies: `altair`, `numpy`, `polars[pyarrow]`, `scipy`.
 
-All functions that accept a DataFrame support both **Polars** and **pandas** DataFrames. A pandas DataFrame is automatically converted to Polars at the boundary via `ds.ensure_polars()`. Pandas is not a declared dependency — it only needs to be installed if you actually pass one in.
+All functions that accept a `DataFrame` support both **`polars`** and **`pandas`** dataframes. A `pandas` `DataFrame` is automatically converted to `polars` for internal processing via `ds.ensure_polars()`.
 
 ---
 
@@ -89,7 +89,7 @@ ds.theme(   # custom configuration
 | `legendStroke` | `False` | Draw a border around the legend box |
 | `markFill` | `"black"` | Default fill color for marks |
 | `markFillOpacity` | `1.0` | Default mark fill opacity |
-| `markSize` | `min(W, H) × 0.1` | Mark size; for points, this is area in sq px |
+| `markSize` | `min(W, H) * 0.1` | Mark size; for points, this is area in sq px |
 | `markStroke` | `"black"` | Default stroke color for marks |
 | `markStrokeOpacity` | `1` | Default mark stroke opacity |
 | `palette` | `None` | Default color scheme applied to category, diverging, heatmap, and ramp scales. Accepts a key from `colors` or a raw list |
@@ -242,8 +242,8 @@ alt.Chart(df).mark_circle().encode(
 |---|---|---|
 | `yCol` | required | Value column |
 | `groupBy` | required | Column(s) defining each beeswarm group |
-| `spread` | `√(markSize/π)` | Collision radius in pixels — defaults to the rendered point radius from the active theme |
-| `heightPx` | theme `chartHeight` | Chart height in pixels |
+| `spread` | `theme(markSize)` | Collision radius in pixels, derived as `√(markSize/π)` to match the rendered point radius |
+| `heightPx` | `theme(chartHeight)` | Chart height in pixels |
 | `outCol` | `"beeswarm_x"` | Output column name |
 
 ---
@@ -289,14 +289,14 @@ ds.add_pvalue(..., pvalues=[0.002, 0.031], yPositions=[4.5, 5.2])
 | `nComparisons` | `len(pairs)` | Number of comparisons for Bonferroni correction |
 | `yPositions` | `None` | Explicit y positions per bracket (overrides auto-stacking) |
 | `yStart` | auto | Y position of the lowest bracket |
-| `yStep` | `yPad × 2` | Vertical distance between stacking levels |
+| `yStep` | `yPad * 2` | Vertical distance between stacking levels |
 | `yPad` | `5` | Padding above data max when yStart is auto-placed |
 | `bracketStyle` | `"line"` | `"line"` (bar only) or `"bracket"` (bar + end ticks) |
 | `labelStyle` | `"p"` | `"p"` renders `p = 0.012` / `p < 0.001`; `"asterisks"` renders `*` / `**` / `***` / `ns` |
-| `tickHeight` | `yStep × 0.25` | End tick height in data units (only for `bracketStyle="bracket"`) |
+| `tickHeight` | `yStep * 0.25` | End tick height in data units (only for `bracketStyle="bracket"`) |
 | `reverse` | `None` | List of `(group1, group2)` tuples identifying brackets to flip below the bar |
 | `categories` | inferred | Ordered list of all x-axis categories |
-| `chartWidth` | `ds.theme()` default | Chart width for computing text x position; auto-read from the active theme, rarely needs to be set explicitly |
+| `chartWidth` | `theme(chartWidth)` | Chart width for computing text x position; auto-read from the active theme, rarely needs to be set explicitly |
 | `decimals` | `3` | Decimal places in the p-value label (only for `labelStyle="p"`) |
 
 ![p-value example](https://raw.githubusercontent.com/dkkung/dysonsphere/main/docs/pvalue_example_light.png)
@@ -340,12 +340,12 @@ Three `style` options are available: `"plusminus"` renders `True` as `+` and `Fa
 | `order` | insertion order | Top-to-bottom row order |
 | `rowHeight` | `14` | Height in pixels per row |
 | `symbol` | `"circle"` | Vega-Lite shape name (`"square"`, `"diamond"`, `"triangle-up"`, etc.) (`"symbol"` style only) |
-| `symbolSize` | `markSize × 4` | Symbol area in square pixels (`"symbol"` style only) |
+| `symbolSize` | `theme(markSize) * 4` | Symbol area in square pixels (`"symbol"` style only) |
 | `connectingLine` | `True` | Draw a rule spanning each consecutive run of `True` values per row (`"symbol"` style only) |
-| `strokeWidth` | `markStrokeWidth` | Stroke width for dots and connecting rule |
+| `strokeWidth` | `theme(markStrokeWidth)` | Stroke width for dots and connecting rule |
 | `yPadding` | `0.1` | Inner padding between rows as a fraction of band step |
-| `chartWidth` | theme default | Width of the annotation chart in pixels |
-| `fontSize` | theme default | Font size for symbols and row labels |
+| `chartWidth` | `theme(chartWidth)` | Width of the annotation chart in pixels |
+| `fontSize` | `theme(fontSize)` | Font size for symbols and row labels |
 
 > **Dark mode:** `"symbol"` style resolves fill colours from `ds.theme()` at construction time. Pass a callable to `ds.save()` so the chart rebuilds after each darkmode toggle:
 > ```python
@@ -378,13 +378,13 @@ ds.save(chart, "violin")
 | `yCol` | required | Value column name |
 | `categories` | required | Ordered list of group labels |
 | `palette` | `None` | Single color or list of colors for violin fills |
-| `boxplotSize` | `markSize × 0.8` | Boxplot box width in pixels |
+| `boxplotSize` | `theme(markSize) * 0.8` | Boxplot box width in pixels |
 | `boxplotColor` | `"black"` | Boxplot fill color |
-| `fillOpacity` | theme default | Violin fill opacity |
+| `fillOpacity` | `theme(markFillOpacity)` | Violin fill opacity |
 | `stroke` | `None` | Violin outline color (`None` = no outline) |
-| `strokeWidth` | theme default | Violin outline width |
+| `strokeWidth` | `theme(markStrokeWidth)` | Violin outline width |
 | `legend` | `False` | Show a color legend |
-| `angledX` | theme default | Angle x-axis labels |
+| `angledX` | `theme(angledX)` | Angle x-axis labels |
 | `steps` | `200` | KDE grid resolution per group |
 
 ### dysonsphere.mark_strip()
@@ -400,8 +400,8 @@ chart = ds.mark_strip(df, "group", "value", CATEGORIES, scatter="beeswarm")
 |---|---|---|
 | `scatter` | `"jitter"` | `"jitter"` (fast, random Gaussian) or `"beeswarm"` (collision-avoidance) |
 | `palette` | `None` | List of colors for points |
-| `pointSize` | theme `markSize` | Point size in sq px |
-| `spread` | `None` | Point spread in pixels. For jitter: std dev (defaults to 2.0). For beeswarm: collision radius (defaults to `√(markSize/π)`) |
+| `pointSize` | `theme(markSize)` | Point size in sq px |
+| `spread` | `None` | Point spread in pixels. For jitter: std dev (defaults to 2.0). For beeswarm: collision radius (defaults to `√(markSize/π)` from theme) |
 | `errorbars` | `True` | Show mean ± error bars |
 | `errorbarExtent` | `"sem"` | `"sem"` or `"sd"` |
 
