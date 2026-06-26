@@ -337,6 +337,7 @@ def add_multilabel_detached(
     palette: list[str] | None = None,
     strokeWidth: float | None = None,
     connectingLine: bool = True,
+    orientation: str = "vertical",
     yPadding: float | None = None,
     chartWidth: int | None = None,
     fontSize: int | None = None,
@@ -370,8 +371,8 @@ def add_multilabel_detached(
     style:
         ``"plusminus"`` renders ``True`` as ``+`` and ``False`` as ``−``.
         ``"symbol"`` renders ``True`` as a filled mark and ``False`` as an unfilled
-        mark, with a horizontal rule connecting each consecutive run of ``True`` values
-        in a row. The mark shape is controlled by ``symbol``. ``"text"`` renders raw
+        mark, with a connecting rule between consecutive ``True`` values (direction
+        set by ``orientation``). The mark shape is controlled by ``symbol``. ``"text"`` renders raw
         group values as center-aligned strings and is forced automatically when any
         value is non-bool.
     labelAlign:
@@ -395,9 +396,13 @@ def add_multilabel_detached(
         Stroke width applied to dot marks and the connecting rule. Defaults
         to ``markStrokeWidth`` from ``ds.theme()``.
     connectingLine:
-        When ``True`` (default), draws a horizontal rule spanning each consecutive
-        run of ``True`` values in a row (``"symbol"`` style only). Set to ``False``
-        to show symbols only.
+        When ``True`` (default), draws a rule spanning each consecutive run of
+        ``True`` values (``"symbol"`` style only). Set to ``False`` to show
+        symbols only. Direction is controlled by ``orientation``.
+    orientation:
+        Direction of the connecting rule. ``"vertical"`` (default) draws a rule
+        down each column spanning consecutive ``True`` rows. ``"horizontal"``
+        draws a rule across each row spanning consecutive ``True`` columns.
     yPadding:
         Inner padding between rows as a fraction of the band step (0–1).
         ``0`` means no gap; ``1`` means bands collapse to zero width.
@@ -602,39 +607,66 @@ def add_multilabel_detached(
         .encode(x=x_enc, y=y_enc)
     )
 
+    if orientation not in ("vertical", "horizontal"):
+        raise ValueError(f"orientation must be 'vertical' or 'horizontal', got {orientation!r}")
+
     line_rows = []
-    for label in row_order:
-        run: list[int] = []
-        for i, v in enumerate(groups[label]):
-            if v is True:
-                run.append(i)
-            else:
-                if len(run) >= 2:
-                    line_rows.append(
-                        {
-                            "__label": label,
-                            "__x_start": categories[run[0]],
-                            "__x_end": categories[run[-1]],
-                        }  # noqa: E501
-                    )
-                run = []
-        if len(run) >= 2:
-            line_rows.append(
-                {"__label": label, "__x_start": categories[run[0]], "__x_end": categories[run[-1]]}  # noqa: E501
-            )
+    if orientation == "horizontal":
+        for label in row_order:
+            run: list[int] = []
+            for i, v in enumerate(groups[label]):
+                if v is True:
+                    run.append(i)
+                else:
+                    if len(run) >= 2:
+                        line_rows.append(
+                            {"__label": label, "__x_start": categories[run[0]], "__x_end": categories[run[-1]]}
+                        )
+                    run = []
+            if len(run) >= 2:
+                line_rows.append(
+                    {"__label": label, "__x_start": categories[run[0]], "__x_end": categories[run[-1]]}
+                )
+    else:  # vertical
+        for i, cat in enumerate(categories):
+            run = []
+            for j, label in enumerate(row_order):
+                if groups[label][i] is True:
+                    run.append(j)
+                else:
+                    if len(run) >= 2:
+                        line_rows.append(
+                            {"__category": cat, "__label": row_order[run[0]], "__label_end": row_order[run[-1]]}
+                        )
+                    run = []
+            if len(run) >= 2:
+                line_rows.append(
+                    {"__category": cat, "__label": row_order[run[0]], "__label_end": row_order[run[-1]]}
+                )
 
     if connectingLine and line_rows:
         lines_df = pl.DataFrame(line_rows)
-        lines = (
-            alt.Chart(lines_df)
-            # strokeDash=[0, 0] overrides the theme's dashedRule=True default.
-            .mark_rule(strokeWidth=strokeWidth, strokeDash=[0, 0])
-            .encode(
-                x=alt.X("__x_start:N", sort=categories),
-                x2="__x_end:N",
-                y=y_enc,
+        if orientation == "horizontal":
+            lines = (
+                alt.Chart(lines_df)
+                # strokeDash=[0, 0] overrides the theme's dashedRule=True default.
+                .mark_rule(strokeWidth=strokeWidth, strokeDash=[0, 0])
+                .encode(
+                    x=alt.X("__x_start:N", sort=categories),
+                    x2="__x_end:N",
+                    y=y_enc,
+                )
             )
-        )
+        else:  # vertical
+            lines = (
+                alt.Chart(lines_df)
+                .mark_rule(strokeWidth=strokeWidth, strokeDash=[0, 0])
+                .encode(
+                    x=x_enc,
+                    y=y_enc,
+                    y2="__label_end:N",
+                )
+            )
         chart = alt.layer(row_labels, lines, negative, positive)
     else:
         chart = alt.layer(row_labels, negative, positive)

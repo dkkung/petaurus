@@ -8,8 +8,8 @@ from .utils import ensure_polars
 
 def _format_pvalue(p: float, decimals: int = 3) -> str:
     if p < 0.001:
-        return "p < 0.001"
-    return f"p = {p:.{decimals}f}"
+        return "P < 0.001"
+    return f"P = {p:.{decimals}f}"
 
 
 def _format_asterisks(p: float) -> str:

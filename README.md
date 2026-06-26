@@ -327,7 +327,7 @@ alt.vconcat(
 
 `groups` values should be booleans: `True` for a positive mark, `False` for a negative mark. If any value is a non-bool (`str`, `int`, `float`), the style is automatically set to `"text"` and values are rendered verbatim — useful for numeric scores or arbitrary labels.
 
-Three `style` options are available: `"plusminus"` renders `True` as `+` and `False` as `−`, `"symbol"` renders `True` as a filled mark and `False` as an unfilled mark (shape set by the `symbol` parameter, default `"circle"`) with an optional connecting rule, and `"text"` renders raw values as strings centered under each category.
+Three `style` options are available: `"plusminus"` renders `True` as `+` and `False` as `−`, `"symbol"` renders `True` as a filled mark and `False` as an unfilled mark (shape set by the `symbol` parameter, default `"circle"`) with an optional connecting rule whose direction is controlled by `orientation`, and `"text"` renders raw values as strings centered under each category.
 
 ![Multilabel example](https://raw.githubusercontent.com/dkkung/dysonsphere/main/docs/multilabel_example_light.png)
 
@@ -342,7 +342,8 @@ Three `style` options are available: `"plusminus"` renders `True` as `+` and `Fa
 | `rowHeight` | `14` | Height in pixels per row |
 | `symbol` | `"circle"` | Vega-Lite shape name (`"square"`, `"diamond"`, `"triangle-up"`, etc.) (`"symbol"` style only) |
 | `symbolSize` | `theme(markSize) * 4` | Symbol area in square pixels (`"symbol"` style only) |
-| `connectingLine` | `True` | Draw a rule spanning each consecutive run of `True` values per row (`"symbol"` style only) |
+| `connectingLine` | `True` | Draw a connecting rule between consecutive `True` values (`"symbol"` style only); direction set by `orientation` |
+| `orientation` | `"vertical"` | `"vertical"` connects consecutive `True` rows within each column; `"horizontal"` connects consecutive `True` columns within each row (`"symbol"` style only) |
 | `strokeWidth` | `theme(markStrokeWidth)` | Stroke width for dots and connecting rule |
 | `yPadding` | `0.1` | Inner padding between rows as a fraction of band step |
 | `chartWidth` | `theme(chartWidth)` | Width of the annotation chart in pixels |
