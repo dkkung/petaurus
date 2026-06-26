@@ -110,7 +110,8 @@ def _pvalue_layer(
     # Asterisk glyphs sit above the baseline with no descenders; p-value text
     # has a 'p' descender that visually closes the gap. Reduce dy for asterisks
     # so the whitespace above the bracket matches the p-value label appearance.
-    _dy_mag = 2 if label_style == "asterisks" else 6
+    # "ns" is alphanumeric like p-value labels, so it uses the larger offset.
+    _dy_mag = 2 if label_style == "asterisks" and label != "ns" else 6
     text_dy = _dy_mag if reverse else -_dy_mag
     tick_y2 = y + tick_height if reverse else y - tick_height
 
@@ -185,7 +186,7 @@ def add_pvalue(
     chartWidth: int | None = None,
     bracket_style: str = "line",
     label_style: str = "p",
-    tick_height: float = 0.5,
+    tick_height: float | None = None,
     strokeWidth: float | None = None,
     fontSize: int | None = None,
     reverse: list[tuple[str, str]] | None = None,
@@ -250,8 +251,9 @@ def add_pvalue(
         ``'p'`` (default) renders ``p = 0.012`` / ``p < 0.001``. ``'asterisks'``
         renders ``*`` / ``**`` / ``***`` / ``ns``.
     tick_height:
-        Height of bracket end ticks in data units. Only used when
-        ``bracket_style='bracket'``.
+        Height of bracket end ticks in data units. Defaults to
+        ``y_step * 0.25`` so ticks scale naturally with bracket spacing.
+        Only used when ``bracket_style='bracket'``.
     strokeWidth:
         Stroke width of bracket lines. Inherits ``axisWidth`` from
         ``ds.theme()`` when not set.
@@ -345,6 +347,8 @@ def add_pvalue(
     # --- y positioning ---
     if y_positions is not None:
         final_y = list(y_positions)
+        if tick_height is None:
+            tick_height = (y_pad * 2) * 0.25
     else:
         if y_start is None:
             annotated_groups = list({g for pair in pairs for g in pair})
@@ -352,6 +356,9 @@ def add_pvalue(
 
         if y_step is None:
             y_step = y_pad * 2
+
+        if tick_height is None:
+            tick_height = y_step * 0.25
 
         # Assign stacking levels via greedy interval scheduling.
         # Shorter spans go to lower levels so narrow brackets sit closer to the data.
