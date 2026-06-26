@@ -8,15 +8,18 @@ Usage (from project root):
     uv run python scripts/build/build_pvalue_example.py
 """
 
+import tempfile
 from pathlib import Path
 
 import altair as alt
 import numpy as np
 import polars as pl
+import vl_convert as vlc
 
 import dysonsphere as ds
+from dysonsphere.export import _fix_tick_alignment
 
-CATEGORIES = ["Group A", "Group B", "Group C"]
+CATEGORIES = ["A", "B", "C"]
 
 rng = np.random.default_rng(42)
 df = pl.DataFrame(
@@ -24,19 +27,19 @@ df = pl.DataFrame(
         "group": [CATEGORIES[0]] * 40 + [CATEGORIES[1]] * 40 + [CATEGORIES[2]] * 40,
         "value": np.concatenate(
             [
-                rng.normal(1.0, 0.35, 40),  # Group A
-                rng.normal(2.2, 0.45, 40),  # Group B — clearly different from Group A (***)
-                rng.normal(1.15, 0.4, 40),  # Group C — barely different from Group A (ns)
+                rng.normal(1.0, 0.35, 40),  # A
+                rng.normal(2.2, 0.45, 40),  # B — clearly different from A (***)
+                rng.normal(1.15, 0.4, 40),  # C — barely different from A (ns)
             ]
         ),
     }
 )
 
-PAIRS = [("Group A", "Group B"), ("Group A", "Group C"), ("Group B", "Group C")]
+PAIRS = [("A", "B"), ("A", "C"), ("B", "C")]
 
 
 def build_pvalue_example():
-    ds.theme(palette="blues2", chartWidth=75, markSize=10, angledX=True, legend=False)
+    ds.theme(palette="blues2", chartWidth=75, markSize=10, legend=False)
 
     x = alt.X("group:N", sort=CATEGORIES, title=None)
 
@@ -80,9 +83,20 @@ def build_pvalue_example():
 
     chart = alt.hconcat(left, right)
 
-    out_base = str(Path(__file__).parent.parent.parent / "docs" / "pvalue_example")
-    ds.save(chart, out_base, background=["light"])
-    print(f"saved {out_base}_light.png")
+    out_png = Path(__file__).parent.parent.parent / "docs" / "pvalue_example_light.png"
+    with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as tmp:
+        tmp_path = tmp.name
+    chart.save(tmp_path)
+    _fix_tick_alignment(
+        tmp_path,
+        band_padding=alt.theme.options.get("bandPadding", 0.1),
+        chart_width=alt.theme.options.get("chartWidth", 100),
+    )
+    with open(tmp_path, encoding="utf-8") as f:
+        svg_content = f.read()
+    Path(tmp_path).unlink()
+    out_png.write_bytes(vlc.svg_to_png(svg_content, ppi=1200))
+    print(f"saved {out_png}")
 
 
 if __name__ == "__main__":
