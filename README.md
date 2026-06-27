@@ -293,13 +293,14 @@ ds.add_pvalue(..., pvalues=[0.002, 0.031], yPositions=[4.5, 5.2])
 | `yPositions` | `None` | Explicit y positions per bracket (overrides auto-stacking) |
 | `yStart` | auto | Y position of the lowest bracket |
 | `yStep` | `yPad * 2` | Vertical distance between stacking levels |
-| `yPad` | `5` | Padding above data max when yStart is auto-placed |
+| `yPad` | auto | Padding above data max when `yStart` is auto-placed. Defaults to a fixed ~8 px visual gap (`bracketStyle="line"`) or ~10 px (`bracketStyle="bracket"`), scaled to data units via `chartHeight` |
 | `bracketStyle` | `"line"` | `"line"` (bar only) or `"bracket"` (bar + end ticks) |
 | `labelStyle` | `"p"` | `"p"` renders `P = 0.012` / `P < 0.001`; `"asterisks"` renders `*` / `**` / `***` / `ns` |
 | `tickHeight` | `yStep * 0.25` | End tick height in data units (only for `bracketStyle="bracket"`) |
 | `reverse` | `None` | List of `(group1, group2)` tuples identifying brackets to flip below the bar |
 | `categories` | inferred | Ordered list of all x-axis categories |
 | `chartWidth` | `theme(chartWidth)` | Chart width for computing text x position; auto-read from the active theme, rarely needs to be set explicitly |
+| `fontSize` | `6` | Font size of p-value labels |
 | `decimals` | `3` | Decimal places in the p-value label (only for `labelStyle="p"`) |
 
 

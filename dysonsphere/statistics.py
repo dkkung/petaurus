@@ -94,7 +94,7 @@ def _pvalue_layer(
     if strokeWidth is None:
         strokeWidth = alt.theme.options.get("axisWidth", 0.5)
     if fontSize is None:
-        fontSize = alt.theme.options.get("fontSize", 7)
+        fontSize = 6
 
     # --- categories and text x position ---
     if categories is None:
@@ -105,13 +105,12 @@ def _pvalue_layer(
     g1_idx = categories.index(group1)
     g2_idx = categories.index(group2)
 
-    _rule_kwargs = {"strokeWidth": strokeWidth, "strokeDash": [0, 0]}
+    stroke_cap = alt.theme.options.get("strokeCap", "round")
+    _rule_kwargs = {"strokeWidth": strokeWidth, "strokeDash": [0, 0], "strokeCap": stroke_cap}
 
-    # Asterisk glyphs sit above the baseline with no descenders; p-value text
-    # has a 'p' descender that visually closes the gap. Reduce dy for asterisks
-    # so the whitespace above the bracket matches the p-value label appearance.
-    # "ns" is alphanumeric like p-value labels, so it uses the larger offset.
-    _dy_mag = 2 if label_style == "asterisks" and label != "ns" else 6
+    # dy offsets in SVG pixels. Asterisk glyphs sit close to the baseline so a small
+    # offset seats them flush; alphanumeric labels (including "ns") need more clearance.
+    _dy_mag = 2 if label_style == "asterisks" and label != "ns" else 4
     text_dy = _dy_mag if reverse else -_dy_mag
     tick_y2 = y + tick_height if reverse else y - tick_height
 
@@ -181,7 +180,7 @@ def add_pvalue(
     yPositions: list[float] | None = None,
     yStart: float | None = None,
     yStep: float | None = None,
-    yPad: float = 5,
+    yPad: float | None = None,
     categories: list | None = None,
     chartWidth: int | None = None,
     bracketStyle: str = "line",
@@ -239,7 +238,10 @@ def add_pvalue(
         Vertical distance (data units) between stacking levels. Defaults to
         ``yPad * 2``.
     yPad:
-        Padding above the data maximum when ``yStart`` is auto-placed.
+        Padding above the data maximum when ``yStart`` is auto-placed. Defaults
+        to a fixed visual gap of ~8 px (``bracketStyle='line'``) or ~10 px
+        (``bracketStyle='bracket'``), expressed in data units via ``chartHeight``
+        so the gap stays visually consistent regardless of chart height.
     categories:
         Ordered list of all x-axis categories. Inferred from ``df`` (sorted
         alphabetically) when not provided.
@@ -259,8 +261,7 @@ def add_pvalue(
         Stroke width of bracket lines. Inherits ``axisWidth`` from
         ``ds.theme()`` when not set.
     fontSize:
-        Font size of p-value labels. Inherits ``fontSize`` from
-        ``ds.theme()`` when not set.
+        Font size of p-value labels. Defaults to ``6``.
     reverse:
         List of ``(group1, group2)`` tuples identifying brackets to flip —
         text moves below the bar and ticks point upward.
@@ -346,6 +347,13 @@ def add_pvalue(
         computed_pvalues = [min(p * n, 1.0) for p in computed_pvalues]
 
     # --- y positioning ---
+    if yPad is None:
+        annotated_groups_for_pad = list({g for pair in pairs for g in pair})
+        y_vals = df.filter(pl.col(xCol).is_in(annotated_groups_for_pad))[yCol]
+        y_range = float(y_vals.max()) - float(y_vals.min())
+        chart_height = alt.theme.options.get("chartHeight", 100)
+        yPad = (10.0 if bracketStyle == "bracket" else 8.0) * y_range / chart_height
+
     if yPositions is not None:
         final_y = list(yPositions)
         if tickHeight is None:
