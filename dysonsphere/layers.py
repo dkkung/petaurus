@@ -334,6 +334,7 @@ def add_shade(
     repeat: int = 1,
     opacity: float = 1.0,
     strokeWidth: float = 0,
+    strokeDash: list[float] | bool | None = None,
     flush: bool | None = None,
 ) -> alt.LayerChart:
     """
@@ -418,6 +419,10 @@ def add_shade(
     strokeWidth:
         Width of the rect border in pixels. Defaults to ``0`` (no stroke).
         When set, the stroke inherits the theme's ``markStroke`` color.
+    strokeDash:
+        Dash pattern for the rect border. ``None`` (default) → solid.
+        ``True`` → inherit ``dashedWidth`` from the active theme.
+        A list (e.g. ``[4, 2]``) → use that pattern directly.
     flush:
         Extend the outermost rects to the axis domain edge (band mode and
         string positions only). ``None`` inherits from the theme's
@@ -428,6 +433,9 @@ def add_shade(
         palette = _colors["greys"][:2]
 
     n_colors = len(palette)
+    resolved_dash = (
+        alt.theme.options.get("dashedWidth", [2, 2]) if strokeDash is True else strokeDash
+    )
     mark_kwargs: dict = {
         "opacity": opacity,
         "strokeWidth": strokeWidth,
@@ -435,6 +443,8 @@ def add_shade(
     }
     if strokeWidth > 0:
         mark_kwargs["stroke"] = alt.theme.options.get("markStroke", "black")
+    if resolved_dash is not None:
+        mark_kwargs["strokeDash"] = resolved_dash
 
     dummy_df = pl.DataFrame({"__dummy": [0]})
 
