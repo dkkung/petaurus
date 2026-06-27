@@ -524,7 +524,7 @@ def add_multilabel_detached(
     if fontSize is None:
         fontSize = alt.theme.options.get("fontSize", 7)
     if rowHeight is None:
-        rowHeight = fontSize * 1.5
+        rowHeight = 10
 
     def _norm(v: object) -> str:
         if isinstance(v, bool):
@@ -545,7 +545,10 @@ def add_multilabel_detached(
         sort=categories,
         axis=alt.Axis(labels=False, ticks=False, domain=False, title=None),
     )
-    y_scale = alt.Scale(paddingInner=yPadding) if yPadding is not None else alt.Undefined
+    y_scale = alt.Scale(
+        domain=row_order,
+        **({"paddingInner": yPadding} if yPadding is not None else {}),
+    )
     # Axis suppressed; row labels are explicit mark_text in row_labels layer below.
     # bandPosition=0.5 is explicit because per-mark defaults vary across mark types.
     y_enc = alt.Y(
@@ -679,6 +682,9 @@ def add_multilabel_detached(
                         }
                     )
         else:  # vertical
+            # Emit two rows per segment (start + end) so mark_line can connect them
+            # using only __label — avoiding a second ordinal field on the shared y
+            # scale, which would corrupt paddingInner and shift row spacing.
             for i, cat in enumerate(categories):
                 run = []
                 for j, label in enumerate(row_order):
@@ -688,22 +694,14 @@ def add_multilabel_detached(
                         run.append(j)
                     else:
                         if len(run) >= 2:
-                            line_rows.append(
-                                {
-                                    "__category": cat,
-                                    "__label": row_order[run[0]],
-                                    "__label_end": row_order[run[-1]],
-                                }
-                            )
+                            _id = f"{cat}_{run[0]}_{run[-1]}"
+                            line_rows.append({"__category": cat, "__label": row_order[run[0]], "__line_id": _id})
+                            line_rows.append({"__category": cat, "__label": row_order[run[-1]], "__line_id": _id})
                         run = []
                 if len(run) >= 2:
-                    line_rows.append(
-                        {
-                            "__category": cat,
-                            "__label": row_order[run[0]],
-                            "__label_end": row_order[run[-1]],
-                        }
-                    )
+                    _id = f"{cat}_{run[0]}_{run[-1]}"
+                    line_rows.append({"__category": cat, "__label": row_order[run[0]], "__line_id": _id})
+                    line_rows.append({"__category": cat, "__label": row_order[run[-1]], "__line_id": _id})
 
         if connectingLine and line_rows:
             lines_df = pl.DataFrame(line_rows)
@@ -721,11 +719,11 @@ def add_multilabel_detached(
             else:  # vertical
                 lines = (
                     alt.Chart(lines_df)
-                    .mark_rule(strokeWidth=strokeWidth, strokeDash=[0, 0])
+                    .mark_line(strokeWidth=strokeWidth, strokeDash=[0, 0])
                     .encode(
                         x=x_enc,
                         y=y_enc,
-                        y2="__label_end:N",
+                        detail="__line_id:N",
                     )
                 )
             layers.extend([lines, negative, positive])
