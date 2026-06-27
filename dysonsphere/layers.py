@@ -332,7 +332,7 @@ def add_shade(
     repeat: int = 2,
     opacity: float = 0.5,
     strokeWidth: float = 0,
-) -> alt.Chart:
+) -> alt.LayerChart:
     """
     Build a background shading layer with one ``mark_rect`` band per x-tick.
 
@@ -340,10 +340,11 @@ def add_shade(
     (no inter-band gap). Colors cycle through ``palette``, using each color for
     ``repeat`` consecutive ticks before advancing to the next.
 
-    The same nominal ``xCol`` field is used as in the main chart so the x scale
-    type is compatible in a layer (no secondary axis). Rect width is set to the
-    band step — since adjacent band centers are always exactly one step apart,
-    this guarantees flush coverage regardless of ``bandPadding``.
+    Consecutive categories that share the same color are merged into a single
+    wider rect. This eliminates sub-pixel antialiasing seams that would
+    otherwise appear between same-color adjacent rects in PNG output. Rect
+    positions are computed as literal pixel values (``alt.value``) so the
+    shade layer does not participate in x-scale merging with the main chart.
 
     Compose this layer behind a main chart with ``+``::
 
@@ -373,18 +374,16 @@ def add_shade(
     n = len(categories)
     n_colors = len(palette)
     color_map = [palette[(i // repeat) % n_colors] for i in range(n)]
-    unique_colors = list(dict.fromkeys(color_map))
 
     band_padding = alt.theme.options.get("bandPadding", 0.1)
     chart_width = alt.theme.options.get("chartWidth", 100)
-    # Matches Vega-Lite's band scale: step = range / (n - paddingInner + 2*paddingOuter)
-    # with paddingInner = paddingOuter = bandPadding, this simplifies to range / (n + bandPadding).
+    # step = range / (n + bandPadding) — Vega-Lite's band scale formula with
+    # paddingInner = paddingOuter = bandPadding.
     step = chart_width / (n + band_padding)
-
-    shade_df = pl.DataFrame({xCol: categories, "__shade_color": color_map})
+    # Pixel position of the first band's center.
+    band_center_0 = step * (0.5 + 0.5 * band_padding)
 
     mark_kwargs: dict = {
-        "width": step,
         "opacity": opacity,
         "strokeWidth": strokeWidth,
         "strokeOpacity": 0 if strokeWidth == 0 else 1,
@@ -392,18 +391,26 @@ def add_shade(
     if strokeWidth > 0:
         mark_kwargs["stroke"] = alt.theme.options.get("markStroke", "black")
 
-    return (
-        alt.Chart(shade_df)
-        .mark_rect(**mark_kwargs)
-        .encode(
-            x=alt.X(f"{xCol}:N", sort=categories, axis=None),
-            fill=alt.Fill(
-                "__shade_color:N",
-                scale=alt.Scale(domain=unique_colors, range=unique_colors),
-                legend=None,
-            ),
+    # Merge consecutive same-color categories so there is no coincident edge
+    # between two rects of the same fill — that edge would show as a faint seam
+    # in rasterized PNG output regardless of opacity.
+    dummy_df = pl.DataFrame({"__dummy": [0]})
+    run_layers: list[alt.Chart] = []
+    i = 0
+    while i < n:
+        j = i
+        while j < n and color_map[j] == color_map[i]:
+            j += 1
+        left = band_center_0 + i * step - step / 2
+        right = band_center_0 + (j - 1) * step + step / 2
+        run_layers.append(
+            alt.Chart(dummy_df)
+            .mark_rect(**mark_kwargs, color=color_map[i])
+            .encode(x=alt.value(left), x2=alt.value(right))
         )
-    )
+        i = j
+
+    return alt.layer(*run_layers)
 
 
 def add_multilabel_detached(
