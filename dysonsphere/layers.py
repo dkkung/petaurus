@@ -401,8 +401,10 @@ def add_shade(
         j = i
         while j < n and color_map[j] == color_map[i]:
             j += 1
-        left = band_center_0 + i * step - step / 2
-        right = band_center_0 + (j - 1) * step + step / 2
+        # Clamp the first run to x=0 and the last run to x=chartWidth so the
+        # shading is flush with the axis domain line on both sides.
+        left = 0 if i == 0 else band_center_0 + i * step - step / 2
+        right = chart_width if j == n else band_center_0 + (j - 1) * step + step / 2
         run_layers.append(
             alt.Chart(dummy_df)
             .mark_rect(**mark_kwargs, color=color_map[i])
