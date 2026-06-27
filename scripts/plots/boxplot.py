@@ -65,22 +65,27 @@ ann = ds.add_pvalue(
     df,
     "group",
     "value",
-    pairs=[("Control", "Drug A"), ("Control", "Drug B")],
+    pairs=[("Control", "Drug A"), ("Control", "Drug B"), ("Drug A", "Drug B")],
     test="mannwhitneyu",
     categories=CATEGORIES,
-    yPositions=[21, 25],
-    labelStyle="asterisks",
+    bracketStyle="line",
 )
 
 chart = points + boxplot + ann
 
-test = {
-    "Control": [False, False, False, False, False, False],
-    "Condition A": [True, True, False, False, True, True],
-    "Condition B": [True, True, True, True, True, True],
+groups = {
+    # "n =": [152, 214, 187, 203, 198, 222],
+    "Condition A": [False, False, False, False, False, True],
+    "Condition B": [False, False, False, False, True, True],
+    "Condition C": [False, False, False, True, True, True],
 }
 
-plot = ds.add_multilabel(chart, test, categories=CATEGORIES, style="symbol")
+plot = ds.add_multilabel(
+    chart,
+    groups,
+    categories=CATEGORIES,
+    rowStyles=["symbol", "symbol", "symbol"],
+)
 
 ds.save(plot, "boxplot")
 print("saved boxplot")
