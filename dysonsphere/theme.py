@@ -46,11 +46,17 @@ def theme(
     palette=None,
     strokeCap="round",  # "butt" | "round" | "square"
     ticks=True,
-    tickSize=5,
+    tickSize=3,
     transparentBackground=False,
     verticalY=False,
     viewFill=None,  # setting a color auto-enables closed
+    xAxis=True,
+    xDomain=True,
+    xLabels=True,
     xTicks=True,
+    yAxis=True,
+    yDomain=True,
+    yLabels=True,
     yTicks=True,
 ):
     """
@@ -108,7 +114,13 @@ def theme(
     alt.theme.options["transparentBackground"] = transparentBackground
     alt.theme.options["verticalY"] = verticalY
     alt.theme.options["viewFill"] = viewFill
+    alt.theme.options["xAxis"] = xAxis
+    alt.theme.options["xDomain"] = xDomain
+    alt.theme.options["xLabels"] = xLabels
     alt.theme.options["xTicks"] = xTicks
+    alt.theme.options["yAxis"] = yAxis
+    alt.theme.options["yDomain"] = yDomain
+    alt.theme.options["yLabels"] = yLabels
     alt.theme.options["yTicks"] = yTicks
 
 
@@ -165,19 +177,23 @@ def custom():
                 "titleFontWeight": opts["fontWeight"],
             },
             "axisX": {
+                "domain": opts["xAxis"] and opts["xDomain"],
                 "labelAlign": (
                     "right" if opts["angledX"] else "center"
                 ),  # keep label alignment distinct between X & Y
                 "labelAngle": 315 if opts["angledX"] else 0,
-                "ticks": True if opts["xTicks"] and opts["ticks"] else False,
+                "labels": opts["xLabels"],
+                "ticks": opts["xAxis"] and opts["xTicks"] and opts["ticks"],
                 "translate": 0,
             },
             "axisY": {
+                "domain": opts["yAxis"] and opts["yDomain"],
                 "labelAlign": (
                     "center" if opts["verticalY"] else "right"
                 ),  # keep label alignment distinct between X & Y
                 "labelAngle": 270 if opts["verticalY"] else 0,
-                "ticks": True if opts["yTicks"] and opts["ticks"] else False,
+                "labels": opts["yLabels"],
+                "ticks": opts["yAxis"] and opts["yTicks"] and opts["ticks"],
                 "translate": 0,
             },
             "bar": {

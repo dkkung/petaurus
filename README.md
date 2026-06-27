@@ -96,12 +96,18 @@ ds.theme(   # custom configuration
 | `palette` | `None` | Default color scheme applied to category, diverging, heatmap, and ramp scales. Accepts a key from `colors` or a raw list |
 | `strokeCap` | `"round"` | Stroke end cap: `"butt"`, `"round"`, or `"square"` |
 | `ticks` | `True` | Show axis ticks |
-| `tickSize` | `5` | Tick length in pixels |
+| `tickSize` | `3` | Tick length in pixels |
 | `transparentBackground` | `False` | Transparent chart background (overrides `chartFill`) |
 | `verticalY` | `False` | Rotate y-axis labels 90° |
 | `viewFill` | `None` | Fill color of the plot area only. Setting this auto-enables `closed` |
-| `xTicks` | `True` | Show ticks on the x-axis |
-| `yTicks` | `True` | Show ticks on the y-axis |
+| `xAxis` | `True` | Toggle for the x-axis — disabling hides the axis domain and axis ticks, but not axis labels |
+| `xDomain` | `True` | Show the x-axis domain line (overridden to `False` when `xAxis=False`) |
+| `xLabels` | `True` | Show tick labels on the x-axis |
+| `xTicks` | `True` | Show ticks on the x-axis (overridden to `False` when `xAxis=False`) |
+| `yAxis` | `True` | Toggle for the y-axis — disabling hides the axis domain and axis ticks, but not axis labels |
+| `yDomain` | `True` | Show the y-axis domain line (overridden to `False` when `yAxis=False`) |
+| `yLabels` | `True` | Show tick labels on the y-axis |
+| `yTicks` | `True` | Show ticks on the y-axis (overridden to `False` when `yAxis=False`) |
 
 ---
 
