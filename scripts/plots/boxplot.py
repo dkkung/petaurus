@@ -39,9 +39,7 @@ df = ds.add_beeswarm(
     groupBy=["group"],
 )
 
-# palette = ds.palette("greys", n=1, start=2)
-# palette = ds.palette("mpl_viridis", n=len(CATEGORIES), start=4)
-palette = ds.palette("blues", n=6, start=0)
+palette = ds.palette("greys", n=6, start=0)
 
 base = alt.Chart(df).encode(
     x=alt.X(
@@ -72,10 +70,12 @@ ann = ds.add_pvalue(
 )
 
 shade = ds.add_shade(
-    CATEGORIES, "group", palette=ds.palette("blues", n=2, start=0, end=2), repeat=2, opacity=1.0
+    CATEGORIES,
+    "group",
 )
 
-chart = shade + points + boxplot  # + ann
+# chart = shade + points + boxplot # with p-value
+chart = shade + points + boxplot  # with shading
 
 groups = {
     # "n =": [152, 214, 187, 203, 198, 222],
