@@ -42,12 +42,7 @@ df = ds.add_beeswarm(
 palette = ds.palette("greys", n=6, start=0)
 
 base = alt.Chart(df).encode(
-    x=alt.X(
-        "group:N",
-        sort=CATEGORIES,
-        # title="Treatment",
-        axis=alt.Axis(labelAngle=-45, labelAlign="right"),
-    ),
+    x=alt.X("group:N", sort=CATEGORIES),
     y=alt.Y("value:Q", title="Response (AU)"),
 )
 
@@ -91,6 +86,7 @@ plot = ds.add_multilabel(
     showSampleSize=True,
     df=df,
     xCol="group",
+    categoryLabel=True,
 )
 
 ds.save(plot, "boxplot")
