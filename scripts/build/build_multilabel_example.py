@@ -24,22 +24,22 @@ CATEGORIES = ["Control", "Drug A", "Drug B", "Drug C"]
 rng = np.random.default_rng(42)
 df = pl.DataFrame(
     {
-        "group": (["Control"] * 50 + ["Drug A"] * 50 + ["Drug B"] * 50 + ["Drug C"] * 50),
+        "group": (["Control"] * 38 + ["Drug A"] * 45 + ["Drug B"] * 52 + ["Drug C"] * 41),
         "value": np.concatenate(
             [
-                rng.normal(1.0, 0.1, 50),
-                rng.normal(2.1, 0.3, 50),
-                rng.normal(5.4, 0.8, 50),
-                rng.normal(7.2, 0.6, 50),
+                rng.normal(1.0, 0.1, 38),
+                rng.normal(2.1, 0.3, 45),
+                rng.normal(5.4, 0.8, 52),
+                rng.normal(7.2, 0.6, 41),
             ]
         ),
     }
 )
 
 CONDITIONS = {
-    "Condition 1": [True, False, True, True],
-    "Condition 2": [False, False, True, False],
-    "Condition 3": [False, False, False, True],
+    "Condition 1": [False, False, False, True],
+    "Condition 2": [False, False, True, True],
+    "Condition 3": [False, True, True, True],
 }
 
 SCORES = {
@@ -58,17 +58,30 @@ def build_multilabel_example():
         chart = ds.mark_strip(df, "group", "value", CATEGORIES)
         KWARGS = dict(categories=CATEGORIES, labelAlign="left")
 
-        def corner_label(style_name: str) -> alt.LayerChart:
+        def corner_label(text: str) -> alt.LayerChart:
+            lines = text.split("\n")
             label = (
                 alt.Chart(alt.Data(values=[{}]))
-                .mark_text(align="left", baseline="top", text=f'style = "{style_name}"')
+                .mark_text(align="left", baseline="top", text=lines if len(lines) > 1 else lines[0])
                 .encode(x=alt.value(4), y=alt.value(4))
             )
             return chart + label
 
-        pm = ds.add_multilabel(corner_label("plusminus"), CONDITIONS, style="plusminus", **KWARGS)
-        dot = ds.add_multilabel(corner_label("symbol"), CONDITIONS, style="symbol", **KWARGS)
-        txt = ds.add_multilabel(corner_label("text"), SCORES, style="text", **KWARGS)
+        pm = ds.add_multilabel(
+            corner_label('style = "plusminus"'), CONDITIONS, style="plusminus", **KWARGS
+        )
+        dot = ds.add_multilabel(
+            corner_label('style = "symbol"'), CONDITIONS, style="symbol", **KWARGS
+        )
+        txt = ds.add_multilabel(
+            corner_label('showSampleSize = True\nstyle = "text"'),
+            {"Score A": SCORES["Score B"], "Score B": SCORES["Score C"]},
+            style="text",
+            showSampleSize=True,
+            df=df,
+            xCol="group",
+            **KWARGS,
+        )
         return alt.hconcat(pm, dot, txt)
 
     out_png = Path(out_base + "_light.png")
