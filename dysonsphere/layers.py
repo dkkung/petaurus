@@ -5,7 +5,7 @@ import numpy as np
 import polars as pl
 
 from .transforms import add_beeswarm, add_jitter
-from .utils import ensure_polars
+from .utils import count_n, ensure_polars
 
 _UNSET = object()
 
@@ -1036,6 +1036,11 @@ def add_multilabel(
     categories: list[str],
     *,
     spacing: int = 0,
+    showSampleSize: bool = False,
+    df=None,
+    xCol: str | None = None,
+    sampleSizeIndex: int = 0,
+    sampleSizeLabel: str = "n =",
     **kwargs,
 ) -> alt.VConcatChart:
     """
@@ -1045,7 +1050,8 @@ def add_multilabel(
     :func:`add_multilabel_detached` layer, and returns
     ``alt.vconcat(chart, annotation, spacing=spacing).resolve_scale(x="shared")``.
 
-    All keyword arguments beyond ``spacing`` are forwarded to :func:`add_multilabel_detached`.
+    All keyword arguments beyond the named parameters are forwarded to
+    :func:`add_multilabel_detached`.
 
     Parameters
     ----------
@@ -1058,6 +1064,22 @@ def add_multilabel(
     spacing:
         Vertical gap in pixels between the chart and the annotation table.
         Defaults to 0 so the annotation sits flush below the axis line.
+    showSampleSize:
+        When ``True``, prepend or append a ``"n ="`` row showing per-category
+        sample counts computed from ``df``. Requires ``df`` and ``xCol``.
+    df:
+        Source DataFrame (Polars or Pandas) used to count samples per category.
+        Only used when ``showSampleSize=True``.
+    xCol:
+        Column name in ``df`` used for x-axis grouping.
+        Only used when ``showSampleSize=True``.
+    sampleSizeIndex:
+        Insertion index among the ``groups`` rows, using ``list.insert()``
+        semantics. ``0`` (default) places the n-row first; ``len(groups)``
+        places it last. Negative indices follow Python convention (``-1`` is
+        second-to-last, not last).
+    sampleSizeLabel:
+        Row label for the sample size row. Defaults to ``"n ="``.
 
     Examples
     --------
@@ -1070,10 +1092,34 @@ def add_multilabel(
             categories=CATEGORIES,
             style="symbol",
             labelAlign="right",
+            showSampleSize=True,
+            df=df,
+            xCol="group",
         )
         ds.save(composed, "my_plot")
     """
     import copy
+
+    if showSampleSize:
+        if df is None or xCol is None:
+            raise ValueError("showSampleSize=True requires both 'df' and 'xCol'.")
+        counts = count_n(df, xCol, categories)
+        # Normalize rowStyles before modifying groups so that list indices
+        # still correspond to the original row order.
+        raw_styles = kwargs.pop("rowStyles", None)
+        if isinstance(raw_styles, list):
+            row_styles = dict(zip(groups.keys(), raw_styles))
+        elif isinstance(raw_styles, dict):
+            row_styles = dict(raw_styles)
+        else:
+            row_styles = {}
+        # Explicitly force the n-row to text style regardless of the global
+        # style setting (e.g. "symbol") — counts always render as plain text.
+        row_styles[sampleSizeLabel] = "text"
+        kwargs["rowStyles"] = row_styles
+        items = list(groups.items())
+        items.insert(sampleSizeIndex, (sampleSizeLabel, counts))
+        groups = dict(items)
 
     modified = copy.deepcopy(chart)
 

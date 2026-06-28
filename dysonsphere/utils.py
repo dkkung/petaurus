@@ -1,6 +1,36 @@
 import polars as pl
 
 
+def count_n(df: pl.DataFrame, xCol: str, categories: list[str]) -> list[int]:
+    """
+    Count the number of rows in ``df`` belonging to each category.
+
+    Parameters
+    ----------
+    df:
+        A ``polars.DataFrame`` or ``pandas.DataFrame``.
+    xCol:
+        Column name used for grouping (the x-axis column).
+    categories:
+        Ordered list of category labels; the returned counts follow this order.
+        Categories with no matching rows return 0.
+
+    Returns
+    -------
+    list[int]
+        Per-category row counts in the same order as ``categories``.
+
+    Examples
+    --------
+    ::
+
+        counts = ds.count_n(df, "group", ["Control", "Drug A", "Drug B"])
+        # [12, 15, 11]
+    """
+    df = ensure_polars(df)
+    return [len(df.filter(pl.col(xCol) == cat)) for cat in categories]
+
+
 def ensure_polars(df: pl.DataFrame) -> pl.DataFrame:
     """
     Convert a pandas DataFrame to Polars, or pass a Polars DataFrame through unchanged.
