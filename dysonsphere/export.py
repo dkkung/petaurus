@@ -262,28 +262,44 @@ def _fix_tick_alignment(path: str, band_padding: float = 0.1, chart_width: float
 
 
 def _fix_log_minor_ticks(path: str) -> None:
-    """Correct integer-rounded SVG positions for log-scale minor axis ticks.
+    """Correct integer-rounded SVG positions for log- and power-scale minor ticks.
 
     Vega rounds all SVG tick transforms to integers. When the chart dimension
-    is not divisible by the number of log intervals, each interval gets a
-    slightly different pixel span, making minor tick spacings visually
-    inconsistent between intervals at high DPI.
+    is not divisible by the number of intervals, each interval gets a slightly
+    different pixel span, making minor tick spacings visually inconsistent at
+    high DPI. This function recomputes each minor tick's exact fractional
+    position within its enclosing major-tick interval and writes it back.
 
     Handles both axes:
       Y-axis: translate(0,N) lines with x2 < 0. Corrects the N (y-coordinate).
       X-axis: translate(N,0) lines with 0 < y2 < 20 (excludes mark_rule
               elements whose y2 equals the full chart height).
 
-    Detects log-scale ticks by finding exactly two distinct sizes in the
-    collected tick lines (major vs minor). Auto-detects whether spacing is
-    base-10 style (non-uniform 2×–9× gaps) or equal-log-space (base-2 etc.)
-    by checking gap uniformity within the first interval.
+    Spacing detection: two distinct tick sizes (major vs minor) must be present
+    in a context group. Gap-uniformity test on the first interval distinguishes
+    base-10 (non-uniform 2×–9× pattern, max_gap > 2 × min_gap) from uniform
+    equal-visual-space (power-scale or non-base-10 log).
 
-    Ticks are grouped by their accumulated parent-group x-offset before
-    processing. This prevents cross-panel contamination in hconcat charts
-    where multiple panels share the same local y-coordinate range but carry
-    different axis scales — without grouping, major ticks from a linear axis
-    in one panel would corrupt interval detection for a log axis in another.
+    Three design points worth noting:
+
+    Per-panel grouping: ticks are collected with their accumulated (cx, cy)
+    parent-transform context. Each unique (cx, cy) is a separate panel
+    coordinate space (hconcat panels differ in cx, vconcat in cy). Processing
+    per group prevents major ticks from a linear axis in one panel from
+    corrupting interval detection in a log/power axis in another.
+
+    Strict upper interval bound: the interval check uses lo - 1 <= pos <= hi
+    (not hi + 1). Minor ticks are strictly between major ticks in data space,
+    so Vega's integer rounding can only push a tick downward — never past hi.
+    A hi + 1 tolerance caused the 9× tick (1 px above the next major tick) to
+    match the wrong interval and be displaced.
+
+    Independent if-branches for translate(0,0): the leftmost x-axis tick has
+    this exact transform, which also matches the y-axis regex translate(0,...).
+    Both pattern checks are independent if-branches so the x-axis branch still
+    runs when the y-axis branch enters but fails x2 < 0, preventing the x=0
+    major tick from being silently dropped and the first interval left
+    uncorrectable.
     """
     import math
     import re

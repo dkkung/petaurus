@@ -82,7 +82,14 @@ def add_log_ticks(
     defaulting to one tick at the geometric midpoint per octave.
 
     Works with ``alt.Chart``, ``alt.LayerChart``, and any chart type
-    composable with ``alt.layer()``.
+    composable with ``alt.layer()``. Also works correctly in ``hconcat``
+    and ``vconcat`` layouts.
+
+    .. note::
+        Use ``ds.save()`` rather than ``chart.save()`` — ``ds.save()``
+        runs an SVG post-processing step that corrects the sub-pixel
+        rounding Vega applies to tick positions, ensuring consistent
+        minor tick spacing at high DPI.
 
     Parameters
     ----------
@@ -255,7 +262,14 @@ def add_pow_ticks(
     use ``exponent=2``, and so on.
 
     Works with ``alt.Chart``, ``alt.LayerChart``, and any chart type
-    composable with ``alt.layer()``.
+    composable with ``alt.layer()``. Also works correctly in ``hconcat``
+    and ``vconcat`` layouts.
+
+    .. note::
+        Use ``ds.save()`` rather than ``chart.save()`` — ``ds.save()``
+        runs an SVG post-processing step that corrects the sub-pixel
+        rounding Vega applies to tick positions, ensuring consistent
+        minor tick spacing at high DPI.
 
     Parameters
     ----------
