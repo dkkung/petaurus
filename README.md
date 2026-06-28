@@ -479,8 +479,9 @@ shade = ds.add_shade(
 | `xCol` | `None` | x-axis column name (band mode only; not used internally) |
 | `positions` | `None` | List of `(start, end)` tuples (single-axis) or `((x_start, x_end), (y_start, y_end))` tuples (`axis='both'`). Activates positions mode |
 | `axis` | `'x'` | `'x'`, `'y'`, or `'both'`. Ignored in band mode (always `'x'`) |
-| `palette` | first two `greys` stops (light mode) / last two `greys` stops (dark mode) | List of hex colors to cycle through. Resolved at call time — pass a callable to `ds.save()` for correct darkmode rendering |
-| `repeat` | `1` | Consecutive ticks per color before advancing (band mode only) |
+| `palette` | `greys[:nShades]` | List of hex colors to cycle through in light mode. Ignored in dark mode — darkest `nShades` greys are always used. Resolved at call time — pass a callable to `ds.save()` for correct darkmode rendering |
+| `nShades` | `2` | Number of colors to use. Slices the first `nShades` stops from `palette` in light mode, or the last `nShades` stops from `"greys"` in dark mode |
+| `repeat` | `1` | Number of consecutive ticks covered by each rect before advancing to the next color (band mode only) |
 | `opacity` | `1.0` | Fill opacity |
 | `stroke` | `False` | `True` → axis-style border: black/white per dark mode, `axisWidth` wide |
 | `strokeWidth` | `None` | Explicit border width in pixels. Overrides `axisWidth` when `stroke=True` |

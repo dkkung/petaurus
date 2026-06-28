@@ -13,6 +13,7 @@ def add_shade(
     positions: list[tuple] | None = None,
     axis: str = 'x',
     palette: list[str] | None = None,
+    nShades: int = 2,
     repeat: int = 1,
     opacity: float = 1.0,
     stroke: bool = False,
@@ -92,11 +93,19 @@ def add_shade(
         explicit x-range and y-range simultaneously. Ignored in band mode
         (always ``'x'``).
     palette:
-        List of hex color strings to cycle through. Defaults to the first
-        two stops of the ``"greys"`` palette.
+        List of hex color strings to cycle through in light mode. Defaults
+        to ``"greys"`` when ``None``. In dark mode this parameter is always
+        ignored — the darkest ``nShades`` stops of ``"greys"`` are used
+        regardless. Resolved at call time; pass a callable to ``ds.save()``
+        for correct darkmode rendering.
+    nShades:
+        Number of colors to use. In light mode, slices the first
+        ``nShades`` stops from ``palette`` (or ``"greys"``). In dark mode,
+        slices the last ``nShades`` stops of ``"greys"``. Defaults to
+        ``2``.
     repeat:
-        Number of consecutive ticks sharing the same color before
-        advancing (band mode only). Defaults to ``1``.
+        Number of consecutive ticks sharing the same color before advancing
+        (band mode only). Defaults to ``1``.
     opacity:
         Fill opacity of the shade rects. Defaults to ``1.0``.
     stroke:
@@ -115,12 +124,14 @@ def add_shade(
         string positions only). ``None`` inherits from the theme's
         ``closed`` setting.
     """
-    if palette is None:
-        from .palettes import colors as _colors
-        if alt.theme.options.get("darkmode", False):
-            palette = _colors["greys"][-2:]
-        else:
-            palette = _colors["greys"][:2]
+    from .palettes import colors as _colors
+    darkmode = alt.theme.options.get("darkmode", False)
+    if darkmode:
+        palette = _colors["greys"][-nShades:]
+    else:
+        if palette is None:
+            palette = _colors["greys"]
+        palette = palette[:nShades]
 
     n_colors = len(palette)
     resolved_dash = (
