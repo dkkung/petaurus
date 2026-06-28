@@ -490,6 +490,126 @@ shade = ds.add_shade(
 
 ---
 
+## Minor ticks for non-linear scales
+
+`add_log_ticks()` and `add_pow_ticks()` add unlabeled minor ticks to log- and power-scaled axes respectively. Both wrap your chart in a layer with an invisible second axis — your chart's data, scale domain, and axis labels are unaffected. Both work with `alt.Chart`, `alt.LayerChart`, and any chart type composable with `alt.layer()`.
+
+![Nonlinear scale example](https://raw.githubusercontent.com/dkkung/dysonsphere/main/docs/nonlinear_example_light.png)
+
+### `add_log_ticks()`
+
+**Base 10** places ticks at the conventional 2×–9× integer multiples within each decade (8 minor ticks per decade, fixed). **Base 2** places `nMinor` equally-spaced ticks per octave in log space — default `nMinor=1` gives one tick at the geometric midpoint (√2 × 2ⁿ). Other integer bases also work using the same equal-spacing rule.
+
+```python
+# log10 y-axis — exp range auto-derived from data
+chart = (
+    alt.Chart(df)
+    .mark_line(point=True)
+    .encode(
+        y=alt.Y("value:Q",
+            scale=alt.Scale(type="log", base=10),
+            axis=alt.Axis(values=[10**e for e in range(exp_min, exp_max + 1)]),
+        ),
+    )
+)
+chart = ds.add_log_ticks(chart, df, "value")
+
+# log2 x-axis — fold change on a volcano plot
+exp_min, exp_max = -4, 4
+chart = (
+    alt.Chart(df)
+    .mark_point()
+    .encode(
+        x=alt.X("fc:Q",
+            scale=alt.Scale(type="log", base=2, domain=[2**exp_min, 2**exp_max]),
+            axis=alt.Axis(values=[2**e for e in range(exp_min, exp_max + 1)]),
+        ),
+    )
+)
+chart = ds.add_log_ticks(chart, df, "fc", axis="x", base=2, expMin=exp_min, expMax=exp_max)
+
+# log2 with 3 minor ticks per octave
+chart = ds.add_log_ticks(chart, df, "fc", axis="x", base=2, nMinor=3)
+
+# both axes log-scaled
+chart = ds.add_log_ticks(chart, df, axis="both", xField="fc", yField="pvalue")
+```
+
+The `expMin` / `expMax` parameters are auto-derived from `df[field].min()` / `.max()` when omitted. When specifying an explicit `domain=` on the main chart's scale, pass matching `expMin` / `expMax` to `add_log_ticks()` so the minor tick layer's internal domain aligns correctly.
+
+| Parameter | Default | Description |
+|---|---|---|
+| `chart` | required | Chart to add minor ticks to |
+| `df` | required | Polars or pandas DataFrame |
+| `field` | `None` | Log-scaled column name. Required for single-axis mode; omit when `axis='both'` |
+| `axis` | `'y'` | `'x'`, `'y'`, or `'both'`. When `'both'`, provide `xField` and `yField` instead of `field` |
+| `base` | `10` | Logarithm base matching the axis scale (`10` or `2` are the common choices) |
+| `nMinor` | `1` | Minor ticks per interval for non-base-10 axes. Ignored when `base=10` |
+| `expMin` | auto | Lowest exponent (in the given `base`). Auto-derived from data when `None` |
+| `expMax` | auto | Highest exponent. Auto-derived from data when `None` |
+| `xField` | `None` | Log-scaled x column (`axis='both'` only) |
+| `yField` | `None` | Log-scaled y column (`axis='both'` only) |
+| `xExpMin`, `xExpMax` | auto | Exponent overrides for x axis (`axis='both'` only) |
+| `yExpMin`, `yExpMax` | auto | Exponent overrides for y axis (`axis='both'` only) |
+| `minorTickSize` | `1.5` | Minor tick length in pixels |
+
+### `add_pow_ticks()`
+
+`add_pow_ticks()` adds minor ticks to a power- or sqrt-scale axis. Unlike `add_log_ticks()`, `majorValues` is required — it must match the `values=` passed to the main chart's `alt.Axis` so the minor tick layer can compute interval boundaries. Minor ticks are placed at positions equally spaced in the power-transformed (visual) space: tick `k` of `nMinor` between major ticks `a` and `b` falls at `(a**exp + k/(nMinor+1) * (b**exp − a**exp))**(1/exp)`.
+
+A useful convention for choosing major ticks on a sqrt axis: pick values whose square roots are evenly spaced. For example, `[0.25, 1.0, 2.25, 4.0]` gives `√L = 0.5, 1.0, 1.5, 2.0` — equal visual spacing.
+
+```python
+# sqrt y-axis — major ticks equally spaced in √y
+major_values = [0, 1, 4, 9, 16, 25]
+chart = (
+    alt.Chart(df)
+    .mark_point()
+    .encode(
+        y=alt.Y("value:Q",
+            scale=alt.Scale(type="pow", exponent=0.5),
+            axis=alt.Axis(values=major_values),
+        ),
+    )
+)
+chart = ds.add_pow_ticks(chart, df, "value", majorValues=major_values)
+
+# sqrt x-axis with 4 minor ticks per interval
+chart = ds.add_pow_ticks(
+    chart, df, "length",
+    axis="x",
+    exponent=0.5,
+    majorValues=[0.25, 1.0, 2.25, 4.0],
+    nMinor=4,
+)
+
+# both axes power-scaled
+chart = ds.add_pow_ticks(
+    chart, df,
+    axis="both",
+    xField="length", yField="value",
+    xMajorValues=[0.25, 1.0, 2.25, 4.0],
+    yMajorValues=[0, 1, 4, 9, 16, 25],
+)
+```
+
+| Parameter | Default | Description |
+|---|---|---|
+| `chart` | required | Chart to add minor ticks to |
+| `df` | required | Polars or pandas DataFrame |
+| `field` | `None` | Power-scaled column name. Required for single-axis mode; omit when `axis='both'` |
+| `axis` | `'y'` | `'x'`, `'y'`, or `'both'`. When `'both'`, provide `xField`, `yField`, `xMajorValues`, and `yMajorValues` |
+| `exponent` | `0.5` | Power exponent matching the axis scale (`0.5` = sqrt, `2` = quadratic) |
+| `majorValues` | required | Ordered major tick data values. Must match `axis.values=` on the main chart |
+| `nMinor` | `4` | Minor ticks between each pair of major ticks |
+| `minorTickSize` | `1.5` | Minor tick length in pixels |
+| `xField` | `None` | Power-scaled x column (`axis='both'` only) |
+| `yField` | `None` | Power-scaled y column (`axis='both'` only) |
+| `xMajorValues` | `None` | Major tick values for x axis (`axis='both'` only) |
+| `yMajorValues` | `None` | Major tick values for y axis (`axis='both'` only) |
+
+---
+
 ## Custom marks
 
 ### dysonsphere.mark_violin()

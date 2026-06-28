@@ -105,6 +105,7 @@ def save(
                 band_padding=alt.theme.options.get("bandPadding", 0.1),
                 chart_width=alt.theme.options.get("chartWidth", 100),
             )
+            _fix_log_minor_ticks(svg_path)
             _layer_axes_to_front(svg_path)
             _simplify_svg(svg_path)
             with open(svg_path, encoding="utf-8") as f:
@@ -258,6 +259,144 @@ def _fix_tick_alignment(path: str, band_padding: float = 0.1, chart_width: float
 
     with open(path, "w", encoding="utf-8") as f:
         f.write(ET.tostring(root, encoding="unicode"))
+
+
+def _fix_log_minor_ticks(path: str) -> None:
+    """Correct integer-rounded SVG positions for log-scale minor axis ticks.
+
+    Vega rounds all SVG tick transforms to integers. When the chart dimension
+    is not divisible by the number of log intervals, each interval gets a
+    slightly different pixel span, making minor tick spacings visually
+    inconsistent between intervals at high DPI.
+
+    Handles both axes:
+      Y-axis: translate(0,N) lines with x2 < 0. Corrects the N (y-coordinate).
+      X-axis: translate(N,0) lines with 0 < y2 < 20 (excludes mark_rule
+              elements whose y2 equals the full chart height).
+
+    Detects log-scale ticks by finding exactly two distinct sizes in the
+    collected tick lines (major vs minor). Auto-detects whether spacing is
+    base-10 style (non-uniform 2×–9× gaps) or equal-log-space (base-2 etc.)
+    by checking gap uniformity within the first interval.
+    """
+    import math
+    import re
+    import xml.etree.ElementTree as ET
+
+    NS = "http://www.w3.org/2000/svg"
+    ET.register_namespace("", NS)
+    ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
+
+    tree = ET.parse(path)
+    root = tree.getroot()
+    changed = False
+
+    def _correct_axis(major_positions: list[float], minor_els: list, is_x: bool) -> None:
+        nonlocal changed
+        n = len(major_positions) - 1
+        if n < 1 or not minor_els:
+            return
+        # Detect uniform vs non-uniform from first interval.
+        lo1, hi1 = major_positions[0], major_positions[1]
+        interval1 = sorted(p for _, p in minor_els if lo1 - 1.0 <= p <= hi1 + 1.0)
+        if not interval1:
+            return
+        n_minor = len(interval1)
+        is_nonuniform = False
+        if n_minor >= 2:
+            gaps = [interval1[i + 1] - interval1[i] for i in range(n_minor - 1)]
+            # Base-10 pattern: clustering makes max gap > 2× min gap.
+            if min(gaps) > 0 and max(gaps) > 2 * min(gaps):
+                is_nonuniform = True
+        n_divs = n_minor + 1
+
+        for el, pos_int in minor_els:
+            for i in range(n):
+                lo = major_positions[i]
+                hi = major_positions[i + 1]
+                if lo - 1.0 <= pos_int <= hi + 1.0:
+                    span = hi - lo
+                    if span == 0:
+                        break
+                    rel = max(0.0, min(1.0, (pos_int - lo) / span))
+                    if is_x:
+                        # X-axis: lo = low-value end (left). rel increases rightward.
+                        # base-10: fraction = log10(m), mval = 10^rel
+                        # uniform:  fraction = k/n_divs, k = round(rel × n_divs)
+                        if is_nonuniform:
+                            mval = max(2, min(9, int(round(10**rel))))
+                            pos_ex = lo + math.log10(mval) * span
+                        else:
+                            k = max(1, min(n_divs - 1, int(round(rel * n_divs))))
+                            pos_ex = lo + (k / n_divs) * span
+                        if abs(pos_ex - pos_int) > 0.001:
+                            el.set("transform", f"translate({pos_ex:.6f},0)")
+                            changed = True
+                    else:
+                        # Y-axis: lo = y_top (high-value end, top). rel increases downward.
+                        # base-10: fraction = log10(m), mval = 10^(1-rel)
+                        # uniform:  fraction = k/n_divs, k = round((1-rel) × n_divs)
+                        if is_nonuniform:
+                            mval = max(2, min(9, int(round(10 ** (1.0 - rel)))))
+                            pos_ex = hi - math.log10(mval) * span
+                        else:
+                            k = max(1, min(n_divs - 1, int(round((1.0 - rel) * n_divs))))
+                            pos_ex = hi - (k / n_divs) * span
+                        if abs(pos_ex - pos_int) > 0.001:
+                            el.set("transform", f"translate(0,{pos_ex:.6f})")
+                            changed = True
+                    break
+
+    # --- Y-axis: translate(0,N) with x2 < 0 ---
+    y_tick_lines: list[tuple[ET.Element, float, float]] = []
+    for el in root.iter(f"{{{NS}}}line"):
+        t = el.get("transform", "")
+        x2_str = el.get("x2", "")
+        m = re.match(r"translate\(0,([0-9.-]+)\)$", t)
+        if not (m and x2_str):
+            continue
+        try:
+            x2_val = float(x2_str)
+        except ValueError:
+            continue
+        if x2_val < 0:
+            y_tick_lines.append((el, float(m.group(1)), abs(x2_val)))
+
+    if y_tick_lines:
+        sizes = sorted({s for _, _, s in y_tick_lines}, reverse=True)
+        if len(sizes) >= 2:
+            major_size, minor_size = sizes[0], sizes[-1]
+            major_ys = sorted(y for _, y, s in y_tick_lines if s == major_size)
+            minor_els = [(el, y) for el, y, s in y_tick_lines if s == minor_size]
+            _correct_axis(major_ys, minor_els, is_x=False)
+
+    # --- X-axis: translate(N,0) with 0 < y2 < 20 ---
+    # Upper bound excludes mark_rule elements whose y2 equals the chart height.
+    x_tick_lines: list[tuple[ET.Element, float, float]] = []
+    for el in root.iter(f"{{{NS}}}line"):
+        t = el.get("transform", "")
+        y2_str = el.get("y2", "")
+        m = re.match(r"translate\(([0-9.-]+),0\)$", t)
+        if not (m and y2_str):
+            continue
+        try:
+            y2_val = float(y2_str)
+        except ValueError:
+            continue
+        if 0 < y2_val < 20:
+            x_tick_lines.append((el, float(m.group(1)), y2_val))
+
+    if x_tick_lines:
+        sizes = sorted({s for _, _, s in x_tick_lines}, reverse=True)
+        if len(sizes) >= 2:
+            major_size, minor_size = sizes[0], sizes[-1]
+            major_xs = sorted(x for _, x, s in x_tick_lines if s == major_size)
+            minor_els = [(el, x) for el, x, s in x_tick_lines if s == minor_size]
+            _correct_axis(major_xs, minor_els, is_x=True)
+
+    if changed:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(ET.tostring(root, encoding="unicode"))
 
 
 def _layer_axes_to_front(path: str) -> None:
