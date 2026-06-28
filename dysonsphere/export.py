@@ -459,15 +459,23 @@ def _simplify_svg(path: str) -> None:
     other SVG editors.
 
     This function removes those wrappers by inlining their children directly into
-    the parent element. Groups that carry any of the following attributes are
-    preserved because they affect rendering or layout: ``transform``,
-    ``clip-path``, ``opacity``, ``mask``, ``filter``, ``style``, ``id``.
-    Definition blocks (``<defs>``, ``<clipPath>``, ``<symbol>``) are left
-    entirely untouched.
+    the parent element. Two classes of ``<g>`` are flattened:
+
+    1. Groups with no rendering-relevant attributes (only ``class`` or nothing).
+    2. Groups whose only rendering attribute is ``transform="translate(0,0)"`` —
+       a no-op that Vega emits as a structural wrapper around chart content.
+       Removing it reduces the ungroup depth in Illustrator by one level without
+       affecting visual output.
+
+    Groups that carry any of the following attributes are preserved: ``clip-path``,
+    ``opacity``, ``mask``, ``filter``, ``style``, ``id``, or any non-trivial
+    ``transform``. Definition blocks (``<defs>``, ``<clipPath>``, ``<symbol>``)
+    are left entirely untouched.
 
     The result is a flatter, editor-friendly SVG that renders identically to the
     original.
     """
+    import re
     import xml.etree.ElementTree as ET
 
     NS = "http://www.w3.org/2000/svg"
@@ -477,6 +485,17 @@ def _simplify_svg(path: str) -> None:
     KEEP_ATTRS = {"transform", "clip-path", "opacity", "mask", "filter", "style", "id"}
     SKIP_TAGS = {f"{{{NS}}}defs", f"{{{NS}}}clipPath", f"{{{NS}}}symbol"}
 
+    _NOOP_TRANSLATE = re.compile(r"translate\(\s*0(?:\.0+)?\s*[,\s]\s*0(?:\.0+)?\s*\)$")
+
+    def _is_noop(child) -> bool:
+        effective = set(child.attrib) & KEEP_ATTRS
+        if not effective:
+            return True
+        # translate(0,0) has no visual effect — safe to inline.
+        if effective == {"transform"} and _NOOP_TRANSLATE.match(child.get("transform", "")):
+            return True
+        return False
+
     def _flatten(parent):
         if parent.tag in SKIP_TAGS:
             return
@@ -484,7 +503,7 @@ def _simplify_svg(path: str) -> None:
         while i < len(parent):
             child = parent[i]
             _flatten(child)
-            if child.tag == f"{{{NS}}}g" and not (set(child.attrib) & KEEP_ATTRS):
+            if child.tag == f"{{{NS}}}g" and _is_noop(child):
                 grandchildren = list(child)
                 parent.remove(child)
                 for j, gc in enumerate(grandchildren):
