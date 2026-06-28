@@ -117,7 +117,10 @@ def add_shade(
     """
     if palette is None:
         from .palettes import colors as _colors
-        palette = _colors["greys"][:2]
+        if alt.theme.options.get("darkmode", False):
+            palette = _colors["greys"][-2:]
+        else:
+            palette = _colors["greys"][:2]
 
     n_colors = len(palette)
     resolved_dash = (
@@ -632,7 +635,7 @@ def _multilabel_layer(
         darkmode = alt.theme.options.get("darkmode", False)
         if darkmode:
             positive_color = "white"
-            negative_fill = colors["greys"][6]
+            negative_fill = colors["greys"][11]
             negative_stroke = "white"
         else:
             positive_color = "black"

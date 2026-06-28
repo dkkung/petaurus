@@ -424,7 +424,7 @@ ds.add_multilabel(
 | `categoryLabelAngle` | `-45` | Rotation angle of the category name text in degrees |
 | `categoryLabelHeight` | auto | Height in pixels reserved for the category label row; auto-computed from font size, angle, and longest label when `None` |
 
- **Dark mode:** `"symbol"` style resolves fill colours from `ds.theme()` at construction time. Pass a callable to `ds.save()` so the chart rebuilds after each darkmode toggle:
+ **Dark mode:** `"symbol"` style resolves fill colours from `ds.theme()` at construction time — positive marks are white, unfilled marks use `greys[11]`. Pass a callable to `ds.save()` so the chart rebuilds after each darkmode toggle:
 > ```python
 > ds.save(
 >     lambda: ds.add_multilabel(chart, CONDITIONS, style="symbol", ...),
@@ -479,7 +479,7 @@ shade = ds.add_shade(
 | `xCol` | `None` | x-axis column name (band mode only; not used internally) |
 | `positions` | `None` | List of `(start, end)` tuples (single-axis) or `((x_start, x_end), (y_start, y_end))` tuples (`axis='both'`). Activates positions mode |
 | `axis` | `'x'` | `'x'`, `'y'`, or `'both'`. Ignored in band mode (always `'x'`) |
-| `palette` | first two `greys` stops | List of hex colors to cycle through |
+| `palette` | first two `greys` stops (light mode) / last two `greys` stops (dark mode) | List of hex colors to cycle through. Resolved at call time — pass a callable to `ds.save()` for correct darkmode rendering |
 | `repeat` | `1` | Consecutive ticks per color before advancing (band mode only) |
 | `opacity` | `1.0` | Fill opacity |
 | `stroke` | `False` | `True` → axis-style border: black/white per dark mode, `axisWidth` wide |
