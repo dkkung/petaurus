@@ -25,9 +25,9 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0.0",
+    "pytest>=9.0.0",
     "ruff>=0.15.17",
-    "vl-convert-python>=1.7.0",
+"vl-convert-python>=1.7.0",
 ]
 
 [project.urls]
