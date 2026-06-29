@@ -534,8 +534,9 @@ def create_config(directory: str | Path | None = None, *, persistent: bool = Fal
     (~/.config/dysonsphere/dysonsphere.toml) instead — this file applies across
     all your projects.
 
-    The file is not overwritten if it already exists. Open the file and uncomment
-    the sections you want to activate, then load them with ds.theme(style="name").
+    The file is not overwritten if it already exists. Edit the values in each
+    section, rename [my_style] to your own style name, and load it with
+    ds.theme(style="name").
     """
     if persistent:
         dest = _user_config_dir() / "dysonsphere.toml"
@@ -550,23 +551,30 @@ def create_config(directory: str | Path | None = None, *, persistent: bool = Fal
     lines = [
         "# dysonsphere.toml",
         "# Theme configuration for dysonsphere.",
-        "# Load a style with: ds.theme(style=\"name\")",
-        "#",
+        "# Load a style with ds.theme(style=\"name\") or dysonsphere.theme(style=\"name\").",
+        "",
         "# Only the keys present in a section are applied — everything else uses",
         "# dysonsphere's built-in defaults. Unknown keys raise a ValueError immediately.",
         "",
         "# [default] applies to every ds.theme() call regardless of style.",
-        "# Leave it empty (or omit it) to use dysonsphere's built-in defaults unchanged.",
+        "# Leave it empty or omit to use dysonsphere's built-in defaults unchanged,",
+        "# or add keys to override the defaults.",
+        "",
         "[default]",
         "",
-        "# Built-in styles — uncomment and edit to customise.",
+        "# Built-in styles — edit values or remove sections you don't need.",
     ]
 
     for name, params in _BUILTIN_STYLES.items():
         lines.append("")
-        lines.append(f"# [{name}]")
+        lines.append(f"[{name}]")
         for k, v in params.items():
-            lines.append(f"# {k} = {_toml_value(v)}")
+            lines.append(f"{k} = {_toml_value(v)}")
+
+    lines += [
+        "",
+        "[my_style]  # rename this and add parameters below",
+    ]
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text("\n".join(lines) + "\n", encoding="utf-8")

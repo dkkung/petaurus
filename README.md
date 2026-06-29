@@ -109,7 +109,7 @@ ds.theme(  # custom configuration
 
 ### Config file
 
-Persistent per-project or per-user overrides can be stored in a TOML config file. Generate a template with all built-in presets commented out:
+Persistent per-project or per-user overrides can be stored in a TOML config file. Generate a template with all built-in presets at their defaults:
 
 ```python
 ds.create_config()                 # writes dysonsphere.toml in the current directory
@@ -148,6 +148,8 @@ transparentBackground=true
 fontSize = 12
 darkmode=true
 transparentBackground=true
+
+[my_style]  # rename this and add parameters below
 ```
 
 ```python

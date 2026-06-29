@@ -164,9 +164,10 @@ class TestCreateConfig:
     def test_contains_builtin_style_names(self, tmp_path):
         create_config(tmp_path)
         content = (tmp_path / "dysonsphere.toml").read_text()
-        assert "# [nih]" in content
-        assert "# [notebook]" in content
-        assert "# [presentation]" in content
+        assert "[nih]" in content
+        assert "[notebook]" in content
+        assert "[presentation]" in content
+        assert "[my_style]" in content
 
     def test_does_not_overwrite(self, tmp_path):
         existing = tmp_path / "dysonsphere.toml"

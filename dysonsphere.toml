@@ -1,15 +1,17 @@
-# dysonsphere theme configuration
-#
-# Place this file in your project root or at
-# ~/.config/dysonsphere/dysonsphere.toml for user-wide defaults.
-#
-# Format: TOML sections, one per named style.
-# Load a style with: ds.theme(style="nih")
-#
-# [default] is optional — omit it or leave it empty to use dysonsphere's
-# built-in defaults unchanged. Add keys here only to override specific
-# parameters for every ds.theme() call regardless of style.
+# dysonsphere.toml
+# Theme configuration for dysonsphere.
+# Load a style with ds.theme(style="name") or dysonsphere.theme(style="name").
+
+# Only the keys present in a section are applied — everything else uses
+# dysonsphere's built-in defaults. Unknown keys raise a ValueError immediately.
+
+# [default] applies to every ds.theme() call regardless of style.
+# Leave it empty or omit to use dysonsphere's built-in defaults unchanged,
+# or add keys to override the defaults.
+
 [default]
+
+# Built-in styles — edit values or remove sections you don't need.
 
 [nih]
 axisWidth = 0.5
@@ -17,13 +19,15 @@ fontSize = 6
 fontWeight = 400
 
 [notebook]
-chartWidth=900
-chartHeight=900
-darkmode=true
-fontSize=18
-transparentBackground=true
+chartWidth = 900
+chartHeight = 900
+darkmode = true
+fontSize = 18
+transparentBackground = true
 
 [presentation]
 fontSize = 12
-darkmode=true
-transparentBackground=true
+darkmode = true
+transparentBackground = true
+
+[my_style]  # rename this and add parameters below
