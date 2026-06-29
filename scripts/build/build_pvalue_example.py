@@ -19,6 +19,9 @@ import vl_convert as vlc
 import dysonsphere as ds
 from dysonsphere.export import _fix_tick_alignment
 
+ROOT = Path(__file__).resolve().parents[2]
+
+
 CATEGORIES = ["A", "B", "C"]
 
 rng = np.random.default_rng(42)
@@ -123,7 +126,7 @@ def build_pvalue_example():
 
     chart = alt.hconcat(left, right, third)
 
-    out_png = Path(__file__).parent.parent.parent / "docs" / "pvalue_example_light.png"
+    out_png = ROOT / "docs" / "pvalue_example_light.png"
     with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as tmp:
         tmp_path = tmp.name
     chart.save(tmp_path)

@@ -16,6 +16,9 @@ import vl_convert as vlc
 import dysonsphere as ds
 from dysonsphere.export import _fix_tick_alignment
 
+ROOT = Path(__file__).resolve().parents[2]
+
+
 GROUPS = ["Control", "Group A", "Group B", "Group C", "Group D", "Group E"]
 n = 20
 
@@ -64,7 +67,7 @@ def build_text_example():
         chart, categories=GROUPS, groups=multi, style="plusminus", categoryLabel=True
     )
 
-    out_png = Path(__file__).resolve().parent.parent.parent / "docs" / "text_example_light.png"
+    out_png = ROOT / "docs" / "text_example_light.png"
     with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as tmp:
         tmp_path = tmp.name
     annotated.save(tmp_path)

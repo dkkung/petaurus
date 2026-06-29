@@ -19,6 +19,9 @@ import vl_convert as vlc
 import dysonsphere as ds
 from dysonsphere.export import _fix_tick_alignment
 
+ROOT = Path(__file__).resolve().parents[2]
+
+
 CATEGORIES = ["Control", "Drug A", "Drug B", "Drug C"]
 
 rng = np.random.default_rng(42)
@@ -52,7 +55,7 @@ SCORES = {
 def build_multilabel_example():
     ds.theme(chartFill="white", palette="blues2")
 
-    out_base = str(Path(__file__).parent.parent.parent / "docs" / "multilabel_example")
+    out_base = str(ROOT / "docs" / "multilabel_example")
 
     def make_chart() -> alt.HConcatChart:
         chart = ds.mark_strip(df, "group", "value", CATEGORIES, yTitle="Value")

@@ -11,6 +11,8 @@ import pathlib
 
 from dysonsphere.palettes import colors
 
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+
 
 def main():
     js_palettes = json.dumps(colors, indent=4)
@@ -51,7 +53,7 @@ for (var paletteName in palettes) {{
 alert("Imported " + Object.keys(palettes).length + " palettes.");
 """
 
-    out = pathlib.Path(__file__).parent.parent / "import_palettes_to_illustrator.jsx"
+    out = ROOT / "scripts" / "import_palettes_to_illustrator.jsx"
     out.write_text(jsx)
     print(f"wrote {out}")
 

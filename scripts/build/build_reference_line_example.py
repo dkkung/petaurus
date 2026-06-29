@@ -19,6 +19,9 @@ import vl_convert as vlc
 import dysonsphere as ds
 from dysonsphere.export import _fix_tick_alignment
 
+ROOT = Path(__file__).resolve().parents[2]
+
+
 GROUPS = ["A", "B", "C", "D"]
 SERIES = ["Series 1", "Series 2"]
 
@@ -105,7 +108,7 @@ def build_reference_line_example():
 
     chart = alt.hconcat(left, right)
 
-    out_png = Path(__file__).parent.parent.parent / "docs" / "reference_line_example_light.png"
+    out_png = ROOT / "docs" / "reference_line_example_light.png"
     with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as tmp:
         tmp_path = tmp.name
     chart.save(tmp_path)

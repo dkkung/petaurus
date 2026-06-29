@@ -17,6 +17,9 @@ import polars as pl
 from dysonsphere.layers import mark_violin
 from dysonsphere.palettes import colors
 
+ROOT = Path(__file__).resolve().parents[2]
+
+
 W = 100  # base chart width / height (px)
 
 # ── Oklab helpers (inlined — no dependency on examples/) ───────────────────
@@ -722,6 +725,6 @@ if __name__ == "__main__":
 
     gallery = _build_gallery()
 
-    out = Path(__file__).parent.parent.parent / "docs" / "index.html"
+    out = ROOT / "docs" / "index.html"
     gallery.save(str(out))
     print(f"saved {out}")

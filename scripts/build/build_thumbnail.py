@@ -56,6 +56,8 @@ from scripts.build.build_gallery import (  # noqa: E402
     _violin_df,
 )
 
+ROOT = Path(__file__).resolve().parents[2]
+
 # ── Volcano data ────────────────────────────────────────────────────────────
 
 _vol_rng = np.random.default_rng(42)
@@ -204,7 +206,7 @@ def build_thumbnail():
         spacing=6,
     ).resolve_scale(**_rs)
 
-    out = Path(__file__).parent.parent.parent / "docs" / "thumbnail_light.png"
+    out = ROOT / "docs" / "thumbnail_light.png"
     chart.save(str(out), ppi=1200)
     print(f"saved {out}")
 

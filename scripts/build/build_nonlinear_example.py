@@ -21,6 +21,9 @@ import vl_convert as vlc
 import dysonsphere as ds
 from dysonsphere.export import _fix_log_minor_ticks
 
+ROOT = Path(__file__).resolve().parents[2]
+
+
 rng = np.random.default_rng(42)
 
 GROUPS = ["Group A", "Group B", "Group C"]
@@ -133,7 +136,7 @@ def build_nonlinear_example():
 
     chart = alt.hconcat(left, right)
 
-    out_png = Path(__file__).parent.parent.parent / "docs" / "nonlinear_example_light.png"
+    out_png = ROOT / "docs" / "nonlinear_example_light.png"
     with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as tmp:
         tmp_path = tmp.name
     chart.save(tmp_path)
