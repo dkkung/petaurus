@@ -733,7 +733,7 @@ The `expMin` / `expMax` parameters are auto-derived from `df[field].min()` / `.m
 | `yField` | `None` | Log-scaled y column (`axis='both'` only) |
 | `xExpMin`, `xExpMax` | auto | Exponent overrides for x axis (`axis='both'` only) |
 | `yExpMin`, `yExpMax` | auto | Exponent overrides for y axis (`axis='both'` only) |
-| `minorTickSize` | `1.5` | Minor tick length in pixels |
+| `minorTickSize` | `tickSize / 2` | Minor tick length in pixels; defaults to half the active theme's `tickSize` (typically `1.5` at the default `tickSize=3`) |
 
 ### `add_pow_ticks()`
 
@@ -789,7 +789,7 @@ chart = ds.add_pow_ticks(
 | `exponent` | `0.5` | Power exponent matching the axis scale (`0.5` = sqrt, `2` = quadratic) |
 | `majorValues` | required | Ordered major tick data values. Must match `axis.values=` on the main chart |
 | `nMinor` | `4` | Minor ticks between each pair of major ticks |
-| `minorTickSize` | `1.5` | Minor tick length in pixels |
+| `minorTickSize` | `tickSize / 2` | Minor tick length in pixels; defaults to half the active theme's `tickSize` (typically `1.5` at the default `tickSize=3`) |
 | `xField` | `None` | Power-scaled x column (`axis='both'` only) |
 | `yField` | `None` | Power-scaled y column (`axis='both'` only) |
 | `xMajorValues` | `None` | Major tick values for x axis (`axis='both'` only) |

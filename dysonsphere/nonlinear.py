@@ -148,7 +148,7 @@ def add_log_ticks(
     xExpMax: int | None = None,
     yExpMin: int | None = None,
     yExpMax: int | None = None,
-    minorTickSize: float = 1.5,
+    minorTickSize: float | None = None,
 ) -> alt.LayerChart:
     """
     Add unlabeled minor ticks to a log-scale axis.
@@ -209,7 +209,9 @@ def add_log_ticks(
     yExpMin, yExpMax:
         Exponent overrides for the y axis (``axis='both'`` only).
     minorTickSize:
-        Length of minor ticks in pixels. Defaults to ``1.5``.
+        Length of minor ticks in pixels. Defaults to half the active
+        theme's ``tickSize`` (``tickSize / 2``; typically ``1.5`` when
+        the default ``tickSize=3`` is in effect).
 
     Examples
     --------
@@ -231,6 +233,9 @@ def add_log_ticks(
     """
     if axis not in ("x", "y", "both"):
         raise ValueError(f"axis must be 'x', 'y', or 'both', got {axis!r}")
+
+    if minorTickSize is None:
+        minorTickSize = alt.theme.options.get("tickSize", 3) / 2
 
     df = ensure_polars(df)
 
@@ -314,7 +319,7 @@ def add_pow_ticks(
     exponent: float = 0.5,
     majorValues: list[float] | None = None,
     nMinor: int = 4,
-    minorTickSize: float = 1.5,
+    minorTickSize: float | None = None,
     xField: str | None = None,
     yField: str | None = None,
     xMajorValues: list[float] | None = None,
@@ -379,7 +384,9 @@ def add_pow_ticks(
         Defaults to ``4`` (divides each interval into five equal
         visual segments).
     minorTickSize:
-        Length of minor ticks in pixels. Defaults to ``1.5``.
+        Length of minor ticks in pixels. Defaults to half the active
+        theme's ``tickSize`` (``tickSize / 2``; typically ``1.5`` when
+        the default ``tickSize=3`` is in effect).
     xField:
         Column name for the x power-scaled field (``axis='both'``
         only).
@@ -426,6 +433,9 @@ def add_pow_ticks(
         raise ValueError(f"axis must be 'x', 'y', or 'both', got {axis!r}")
     if exponent == 0:
         raise ValueError("exponent must be non-zero.")
+
+    if minorTickSize is None:
+        minorTickSize = alt.theme.options.get("tickSize", 3) / 2
 
     df = ensure_polars(df)
 
