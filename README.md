@@ -636,39 +636,44 @@ The `x` and `y` parameters accept three forms: a `float`/`int` for quantitative 
 
 #### Axis label reformatting
 
-`log_label_expr()` returns a Vega `labelExpr` string for typeset log-scale axis labels. Two notations are available:
-
-- **Power notation** (`notation="power"`, default): `10⁴`, `2²⁰` — shows the base and exponent explicitly. Works for any integer base.
-- **Scientific notation** (`notation="scientific"`): `1×10⁴` — the conventional mantissa × power-of-10 form. Base-10 only; assumes tick values are exact powers of 10.
-
-For other label styles, use Vega-Lite's `format=` parameter on `alt.Axis` directly — no `labelExpr` needed: `format="~s"` gives SI prefixes (`100k`, `1M`), `format=".0e"` gives e-notation (`1e+4`).
+`log_label_expr()` returns a Vega `labelExpr` string for log-scale axis labels. Four notations are available, although `e` and `si` are also supplied with base `altair` via Vega-Lite's d3 `format()`.:
 
 ```python
-# power notation — base-10 y-axis: 10⁴, 10⁵, 10⁶, …
+# Power notation — 10⁴, 10⁵, 10⁶, … (any integer base)
 axis = alt.Axis(
     values=[10**e for e in range(exp_min, exp_max + 1)],
     labelExpr=ds.log_label_expr(),
 )
 
-# power notation — log2 x-axis: 2⁰, 2¹, …, 2²⁰
+# Power notation — log2 axis: 2⁰, 2¹, …, 2²⁰
 axis = alt.Axis(
     values=[2**e for e in range(0, 21)],
     labelExpr=ds.log_label_expr(base=2),
 )
 
-# scientific notation — base-10 y-axis: 1×10⁴, 1×10⁵, 1×10⁶, …
+# Scientific notation — 1×10⁴, 1×10⁵, 1×10⁶, … (base-10 only)
 axis = alt.Axis(
     values=[10**e for e in range(exp_min, exp_max + 1)],
     labelExpr=ds.log_label_expr(notation="scientific"),
 )
-```
 
-Supports exponents up to ±99, covering all practical scientific and computing ranges.
+# E-notation — 1e+4, 1e+5, 1e+6, … (base-10 only)
+axis = alt.Axis(
+    values=[10**e for e in range(exp_min, exp_max + 1)],
+    labelExpr=ds.log_label_expr(notation="e"),
+)
+
+# SI prefix notation — 10k, 100k, 1M, … (base-10 only)
+axis = alt.Axis(
+    values=[10**e for e in range(exp_min, exp_max + 1)],
+    labelExpr=ds.log_label_expr(notation="si"),
+)
+```
 
 | Parameter | Default | Description |
 |---|---|---|
 | `base` | `10` | Logarithm base matching the axis scale |
-| `notation` | `"power"` | `"power"` or `"scientific"`. `"scientific"` requires `base=10` |
+| `notation` | `"power"` | `"power"` (e.g. `10⁴`, any integer base), `"scientific"` (e.g. `1×10⁴`), `"e"` (e.g. `1e+4`), or `"si"` (e.g. `10k`, `1M`). All notations except `"power"` require `base=10`. Power and scientific support exponents up to ±99 |
 
 #### Minor ticks
 

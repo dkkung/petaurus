@@ -14,22 +14,21 @@ _SUP = "⁰¹²³⁴⁵⁶⁷⁸⁹"
 def log_label_expr(base: int = 10, notation: str = "power") -> str:
     """Return a Vega ``labelExpr`` string for base-N log-scale axis labels.
 
-    Two notations are available:
+    Four notations are available:
 
     - ``"power"`` (default): e.g. ``10⁴``, ``2⁻³``, ``2²⁰``.
       Works for any integer base.
     - ``"scientific"``: e.g. ``1×10⁴``, ``1×10⁻³``.
-      Base-10 only; raises ``ValueError`` for other bases. Assumes tick values
-      are exact powers of 10 (i.e. ``values=`` contains only ``10**n``), so
-      the mantissa is always ``1``.
+      Base-10 only. Assumes tick values are exact powers of 10 so the
+      mantissa is always ``1``; raises ``ValueError`` for other bases.
+    - ``"e"``: e.g. ``1e+4``, ``1e-3``.
+      Base-10 only. Uses Vega's ``format(datum.value, '.0e')`` internally.
+      Best suited for axes whose ``values=`` are exact powers of 10.
+    - ``"si"``: e.g. ``10k``, ``1M``, ``100µ``.
+      Base-10 only. Uses Vega's ``format(datum.value, '~s')`` internally;
+      trims insignificant trailing zeros automatically.
 
-    For other label styles (e.g. SI prefixes ``100k``, ``1M``, or plain
-    e-notation ``1e4``), use Vega-Lite's built-in ``format=`` parameter on
-    ``alt.Axis`` instead — no ``labelExpr`` needed.
-
-    Supports exponents up to ±99, covering all practical scientific and
-    computing ranges for bases 2 and 10.
-
+    Supports exponents up to ±99 for ``"power"`` and ``"scientific"``.
     Pass the return value directly to ``alt.Axis(labelExpr=...)``.
 
     Parameters
@@ -37,8 +36,8 @@ def log_label_expr(base: int = 10, notation: str = "power") -> str:
     base:
         Logarithm base. Defaults to ``10``.
     notation:
-        ``"power"`` (default) or ``"scientific"``. ``"scientific"`` requires
-        ``base=10``.
+        ``"power"`` (default), ``"scientific"``, ``"e"``, or ``"si"``.
+        All notations except ``"power"`` require ``base=10``.
 
     Examples
     --------
@@ -61,11 +60,25 @@ def log_label_expr(base: int = 10, notation: str = "power") -> str:
             values=[10**e for e in range(4, 8)],
             labelExpr=ds.log_label_expr(notation="scientific"),
         )
+
+        # e-notation — base-10 y-axis: 1e+4, 1e+5, 1e+6, …
+        axis=alt.Axis(
+            values=[10**e for e in range(4, 8)],
+            labelExpr=ds.log_label_expr(notation="e"),
+        )
+
+        # SI prefix notation — base-10 y-axis: 10k, 100k, 1M, …
+        axis=alt.Axis(
+            values=[10**e for e in range(4, 8)],
+            labelExpr=ds.log_label_expr(notation="si"),
+        )
     """
-    if notation not in ("power", "scientific"):
-        raise ValueError(f"notation must be 'power' or 'scientific', got {notation!r}")
-    if notation == "scientific" and base != 10:
-        raise ValueError("notation='scientific' is only defined for base=10.")
+    if notation not in ("power", "scientific", "e", "si"):
+        raise ValueError(
+            f"notation must be 'power', 'scientific', 'e', or 'si', got {notation!r}"
+        )
+    if notation != "power" and base != 10:
+        raise ValueError(f"notation={notation!r} is only defined for base=10.")
 
     # Vega expression building blocks. abs_exp must be written out in full each
     # time it appears — Vega's restricted expression language has no variable
@@ -75,6 +88,12 @@ def log_label_expr(base: int = 10, notation: str = "power") -> str:
     sup = f"'{_SUP}'"
     # two-digit superscript lookup (handles exponents 10–99)
     two = f"({ae} >= 10 ? {sup}[floor({ae}/10)] + {sup}[{ae}%10] : {sup}[{ae}])"
+
+    if notation == "e":
+        return "format(datum.value, '.0e')"
+
+    if notation == "si":
+        return "format(datum.value, '~s')"
 
     if notation == "scientific":
         # Mantissa is always 1 because tick values are expected to be exact powers of 10.

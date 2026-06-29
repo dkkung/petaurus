@@ -52,6 +52,22 @@ class TestLogLabelExpr:
         with pytest.raises(ValueError, match="base=10"):
             log_label_expr(base=2, notation="scientific")
 
+    def test_e_notation_base10(self):
+        expr = log_label_expr(notation="e")
+        assert ".0e" in expr
+
+    def test_e_notation_non_base10_raises(self):
+        with pytest.raises(ValueError, match="base=10"):
+            log_label_expr(base=2, notation="e")
+
+    def test_si_notation_base10(self):
+        expr = log_label_expr(notation="si")
+        assert "~s" in expr
+
+    def test_si_notation_non_base10_raises(self):
+        with pytest.raises(ValueError, match="base=10"):
+            log_label_expr(base=2, notation="si")
+
     def test_unknown_notation_raises(self):
         with pytest.raises(ValueError, match="notation"):
             log_label_expr(notation="invalid")
