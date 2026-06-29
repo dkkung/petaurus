@@ -14,7 +14,7 @@ import altair as alt
 import numpy as np
 import polars as pl
 
-from dysonsphere.layers import mark_violin
+from dysonsphere.marks import mark_violin
 from dysonsphere.palettes import colors
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -72,6 +72,7 @@ GROUPS = [
             "greys",
             "reds",
             "rose",
+            "pinks",
             "oranges",
             "browns",
             "yellows",
@@ -91,6 +92,7 @@ GROUPS = [
             "greys2",
             "reds2",
             "roses2",
+            "pinks2",
             "oranges2",
             "browns2",
             "yellows2",
