@@ -1,0 +1,83 @@
+import altair as alt
+import pytest
+
+from dysonsphere.theme import theme
+
+
+@pytest.fixture(autouse=True)
+def reset_theme():
+    theme()
+    yield
+    theme()
+
+
+class TestThemeDefaults:
+    def test_options_populated(self):
+        opts = alt.theme.options
+        assert "chartWidth" in opts
+        assert "chartHeight" in opts
+        assert "axisWidth" in opts
+        assert "markSize" in opts
+        assert "markStrokeWidth" in opts
+        assert "closed" in opts
+        assert "darkmode" in opts
+
+    def test_mark_size_default(self):
+        theme(chartWidth=200, chartHeight=100)
+        assert alt.theme.options["markSize"] == pytest.approx(10.0)
+
+    def test_mark_size_uses_min_dimension(self):
+        theme(chartWidth=50, chartHeight=200)
+        assert alt.theme.options["markSize"] == pytest.approx(5.0)
+
+    def test_mark_stroke_width_defaults_to_axis_width(self):
+        theme(axisWidth=0.5)
+        assert alt.theme.options["markStrokeWidth"] == pytest.approx(0.5)
+
+    def test_mark_stroke_width_explicit(self):
+        theme(axisWidth=0.5, markStrokeWidth=1.0)
+        assert alt.theme.options["markStrokeWidth"] == pytest.approx(1.0)
+
+    def test_closed_defaults_false(self):
+        theme()
+        assert alt.theme.options["closed"] is False
+
+    def test_view_fill_auto_closes(self):
+        theme(viewFill="#eeeeee")
+        assert alt.theme.options["closed"] is True
+
+    def test_closed_explicit_overrides_view_fill(self):
+        theme(viewFill="#eeeeee", closed=False)
+        assert alt.theme.options["closed"] is False
+
+    def test_chart_fill_defaults_white_light_mode(self):
+        theme(darkmode=False)
+        assert alt.theme.options["chartFill"] == "white"
+
+    def test_chart_fill_none_in_dark_mode(self):
+        theme(darkmode=True)
+        assert alt.theme.options["chartFill"] is None
+
+    def test_options_reset_on_each_call(self):
+        theme(grid=True)
+        assert alt.theme.options["grid"] is True
+        theme()
+        assert alt.theme.options["grid"] is False
+
+    def test_palette_string_resolved_to_list(self):
+        theme(palette="blues")
+        from dysonsphere.palettes import colors
+        assert alt.theme.options["palette"] == colors["blues"]
+
+    def test_palette_unknown_string_passed_through(self):
+        theme(palette="tableau10")
+        assert alt.theme.options["palette"] == "tableau10"
+
+
+class TestThemeRegistration:
+    def test_theme_registered_as_dysonsphere(self):
+        assert "dysonsphere" in alt.theme.names()
+
+    def test_theme_is_active(self):
+        theme()
+        assert alt.theme.active == "dysonsphere"

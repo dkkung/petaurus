@@ -1,0 +1,74 @@
+import altair as alt
+import pytest
+
+from dysonsphere.layers import _rule_mark_kwargs, add_rule
+from dysonsphere.theme import theme
+
+
+@pytest.fixture(autouse=True)
+def default_theme():
+    theme(dashedWidth=[2, 2])
+
+
+class TestRuleMarkKwargs:
+    def test_opacity_always_present(self):
+        kwargs = _rule_mark_kwargs(color=None, strokeWidth=None, strokeDash=None, opacity=0.5)
+        assert kwargs["opacity"] == pytest.approx(0.5)
+
+    def test_color_none_omitted(self):
+        kwargs = _rule_mark_kwargs(color=None, strokeWidth=None, strokeDash=None, opacity=1.0)
+        assert "color" not in kwargs
+
+    def test_color_set(self):
+        kwargs = _rule_mark_kwargs(color="red", strokeWidth=None, strokeDash=None, opacity=1.0)
+        assert kwargs["color"] == "red"
+
+    def test_stroke_width_none_omitted(self):
+        kwargs = _rule_mark_kwargs(color=None, strokeWidth=None, strokeDash=None, opacity=1.0)
+        assert "strokeWidth" not in kwargs
+
+    def test_stroke_width_set(self):
+        kwargs = _rule_mark_kwargs(color=None, strokeWidth=2.0, strokeDash=None, opacity=1.0)
+        assert kwargs["strokeWidth"] == pytest.approx(2.0)
+
+    def test_stroke_dash_none_omitted(self):
+        kwargs = _rule_mark_kwargs(color=None, strokeWidth=None, strokeDash=None, opacity=1.0)
+        assert "strokeDash" not in kwargs
+
+    def test_stroke_dash_false_forces_solid(self):
+        kwargs = _rule_mark_kwargs(color=None, strokeWidth=None, strokeDash=False, opacity=1.0)
+        assert kwargs["strokeDash"] == [0, 0]
+
+    def test_stroke_dash_true_reads_theme(self):
+        kwargs = _rule_mark_kwargs(color=None, strokeWidth=None, strokeDash=True, opacity=1.0)
+        assert kwargs["strokeDash"] == [2, 2]
+
+    def test_stroke_dash_list_passthrough(self):
+        kwargs = _rule_mark_kwargs(color=None, strokeWidth=None, strokeDash=[4, 2], opacity=1.0)
+        assert kwargs["strokeDash"] == [4, 2]
+
+
+class TestAddRule:
+    def test_no_label_returns_chart(self):
+        result = add_rule(0.5)
+        assert isinstance(result, alt.Chart)
+
+    def test_with_label_returns_layer_chart(self):
+        result = add_rule(0.5, label="threshold")
+        assert isinstance(result, alt.LayerChart)
+
+    def test_multiple_values_returns_chart(self):
+        result = add_rule([0.25, 0.5, 0.75])
+        assert isinstance(result, alt.Chart)
+
+    def test_multiple_values_with_labels_returns_layer(self):
+        result = add_rule([0.25, 0.75], label=["low", "high"])
+        assert isinstance(result, alt.LayerChart)
+
+    def test_vertical_rule(self):
+        result = add_rule(5.0, axis="x")
+        assert isinstance(result, alt.Chart)
+
+    def test_invalid_axis_raises(self):
+        with pytest.raises(ValueError, match="axis"):
+            add_rule(0.5, axis="z")

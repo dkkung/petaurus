@@ -1,0 +1,87 @@
+import numpy as np
+import polars as pl
+import pytest
+
+from dysonsphere.theme import theme
+from dysonsphere.transforms import add_beeswarm, add_jitter, beeswarm_offsets
+
+
+@pytest.fixture(autouse=True)
+def default_theme():
+    theme(chartWidth=200, chartHeight=200)
+
+
+@pytest.fixture
+def group_df():
+    rng = np.random.default_rng(0)
+    return pl.DataFrame({
+        "group": ["A"] * 20 + ["B"] * 20,
+        "value": np.concatenate([rng.normal(0, 1, 20), rng.normal(2, 1, 20)]),
+    })
+
+
+class TestBeeswarmOffsets:
+    def test_empty_input(self):
+        result = beeswarm_offsets(np.array([]))
+        assert len(result) == 0
+
+    def test_single_point_zero_offset(self):
+        result = beeswarm_offsets(np.array([5.0]))
+        assert result[0] == pytest.approx(0.0)
+
+    def test_output_length_matches_input(self):
+        vals = np.linspace(0, 10, 30)
+        result = beeswarm_offsets(vals, spread=3.0)
+        assert len(result) == len(vals)
+
+    def test_no_overlaps(self):
+        rng = np.random.default_rng(42)
+        y = rng.uniform(0, 100, 40)
+        spread = 4.0
+        x = beeswarm_offsets(y, heightPx=200, spread=spread)
+        y_px = (y - y.min()) / max(y.max() - y.min(), 1e-9) * 200
+        for i in range(len(y)):
+            for j in range(i + 1, len(y)):
+                dist_sq = (x[i] - x[j]) ** 2 + (y_px[i] - y_px[j]) ** 2
+                assert dist_sq >= (2 * spread) ** 2 - 1e-6, (
+                    f"Points {i} and {j} overlap: dist²={dist_sq:.4f}, min²={(2*spread)**2:.4f}"
+                )
+
+    def test_identical_y_values_spread_out(self):
+        y = np.array([5.0, 5.0, 5.0, 5.0])
+        spread = 2.0
+        x = beeswarm_offsets(y, heightPx=100, spread=spread)
+        assert len(set(x)) > 1
+
+
+class TestAddJitter:
+    def test_adds_offset_column(self, group_df):
+        result = add_jitter(group_df)
+        assert "jitter_x" in result.columns
+
+    def test_output_length_unchanged(self, group_df):
+        result = add_jitter(group_df)
+        assert len(result) == len(group_df)
+
+    def test_custom_column_name(self, group_df):
+        result = add_jitter(group_df, outCol="my_jitter")
+        assert "my_jitter" in result.columns
+
+    def test_spread_controls_width(self, group_df):
+        tight = add_jitter(group_df, spread=0.5, seed=0)
+        wide = add_jitter(group_df, spread=20.0, seed=0)
+        assert tight["jitter_x"].abs().max() < wide["jitter_x"].abs().max()
+
+
+class TestAddBeeswarm:
+    def test_adds_offset_column(self, group_df):
+        result = add_beeswarm(group_df, yCol="value", groupBy=["group"])
+        assert "beeswarm_x" in result.columns
+
+    def test_output_length_unchanged(self, group_df):
+        result = add_beeswarm(group_df, yCol="value", groupBy=["group"])
+        assert len(result) == len(group_df)
+
+    def test_custom_column_name(self, group_df):
+        result = add_beeswarm(group_df, yCol="value", groupBy=["group"], outCol="my_swarm")
+        assert "my_swarm" in result.columns
