@@ -10,11 +10,11 @@ df = pl.DataFrame(
     {
         "group": (
             ["Control"] * 200
-            + ["Drug A"] * 200
-            + ["Drug B"] * 200
-            + ["Drug C"] * 200
-            + ["Drug D"] * 200
-            + ["Drug E"] * 200
+            + ["Group A"] * 200
+            + ["Group B"] * 200
+            + ["Group C"] * 200
+            + ["Group D"] * 200
+            + ["Group E"] * 200
         ),
         "value": np.concatenate(
             [
@@ -29,7 +29,7 @@ df = pl.DataFrame(
     }
 )
 
-CATEGORIES = ["Control", "Drug A", "Drug B", "Drug C", "Drug D", "Drug E"]
+CATEGORIES = ["Control", "Group A", "Group B", "Group C", "Group D", "Group E"]
 
 ds.theme()
 
@@ -58,7 +58,7 @@ ann = ds.add_pvalue(
     df,
     "group",
     "value",
-    pairs=[("Control", "Drug A"), ("Control", "Drug B"), ("Drug A", "Drug B")],
+    pairs=[("Control", "Group A"), ("Control", "Group B"), ("Group A", "Group B")],
     test="mannwhitneyu",
     categories=CATEGORIES,
     bracketStyle="line",
@@ -70,23 +70,29 @@ shade = ds.add_shade(
 )
 
 # chart = shade + points + boxplot # with p-value
-chart = shade + points + boxplot  # with shading
+# chart = shade + points + boxplot  # with shading
+chart = points + boxplot
+
+# groups = {
+#     "Condition A": [False, False, False, False, False, True],
+#     "Condition B": [False, False, False, False, True, True],
+#     "Condition C": [False, False, False, True, True, True],
+# }
 
 groups = {
-    "Condition A": [False, False, False, False, False, True],
-    "Condition B": [False, False, False, False, True, True],
-    "Condition C": [False, False, False, True, True, True],
+    "Treatment 1": [False, False, "A", "A", "B", "B"],
+    "Treatment 2": [False, True, False, True, False, True],
 }
 
 plot = ds.add_multilabel(
     chart,
     groups,
     categories=CATEGORIES,
-    rowStyles=["symbol", "symbol", "symbol"],
+    # rowStyles=["symbol", "symbol", "symbol"],
     showSampleSize=True,
     df=df,
     xCol="group",
-    categoryLabel=True,
+    # categoryLabel=True,
 )
 
 ds.save(plot, "boxplot")
