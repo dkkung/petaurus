@@ -17,7 +17,7 @@ import polars as pl
 
 import dysonsphere as ds
 import scripts.build.build_gallery as _bg
-from dysonsphere.layers import mark_violin
+from dysonsphere.marks import mark_violin
 from dysonsphere.palettes import colors
 
 KEY = "blues2"

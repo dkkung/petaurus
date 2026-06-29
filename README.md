@@ -808,14 +808,14 @@ chart = ds.add_pow_ticks(
 
 ### Building palettes
 
-`scripts/build/build_palettes.py` documents the Oklab recipes for all custom palette families and prints updated hex literals to stdout. Use this to calibrate or extend palettes.
+`scripts/build/print_palettes.py` documents the Oklab recipes for all custom palette families and prints updated hex literals to stdout. Use this to calibrate or extend palettes.
 
 ```sh
 # uv
-uv run scripts/build/build_palettes.py
+uv run python scripts/build/print_palettes.py
 
 # pip
-python3 scripts/build/build_palettes.py
+python3 scripts/build/print_palettes.py
 ```
 
 The four recipes are:
