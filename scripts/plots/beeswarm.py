@@ -29,7 +29,7 @@ df = pl.DataFrame(
     }
 )
 
-ds.theme(xLabelAngle=-45, markSize=3)
+ds.theme(xLabelAngle=-45)
 
 df = ds.add_beeswarm(df, yCol="value", groupBy=["group"])
 
@@ -44,7 +44,7 @@ x = alt.X("group:N", sort=CATEGORIES, title=None)
 
 points = (
     alt.Chart(df)
-    .mark_point()
+    .mark_circle()
     .encode(
         x=x,
         y=alt.Y("value:Q", title="Response (AU)"),
