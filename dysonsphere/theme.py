@@ -278,7 +278,7 @@ def custom():
             },
             "errorband": {
                 "band": {
-                    "fillOpacity": 0.90,
+                    "fillOpacity": 0.60,
                     "stroke": None,
                     "strokeWidth": opts["markStrokeWidth"],
                     "strokeOpacity": opts["markStrokeOpacity"],

@@ -5,7 +5,6 @@ import numpy as np
 import polars as pl
 
 import dysonsphere as ds
-from dysonsphere.palettes import colors
 
 rng = np.random.default_rng(42)
 
@@ -24,7 +23,7 @@ for group in GROUPS:
 
 df = pl.DataFrame(rows)
 
-palette = ds.palette("blues2", n=len(GROUPS), start=0)
+palette = ds.palette("lavenders", n=len(GROUPS), start=0)
 
 ds.theme(chartWidth=200, chartHeight=120, legend=True)
 
@@ -38,8 +37,7 @@ band = (
     .encode(
         x=alt.X("time:Q", title="Time (h)"),
         y=alt.Y("value:Q", title="Response (AU)"),
-        detail=alt.Detail("group:N"),
-        color=alt.ColorValue(colors["blues"][0]),
+        color=alt.Color("group:N", sort=GROUPS, title=None, scale=alt.Scale(range=palette)),
     )
     .mark_errorband(extent="ci")
 )
