@@ -12,7 +12,7 @@ from pathlib import Path
 
 BUILD_DIR = Path(__file__).parent / "build"
 
-scripts = sorted(BUILD_DIR.glob("*.py"))
+scripts = sorted(BUILD_DIR.glob("build_*.py"))
 failures = []
 
 for path in scripts:
