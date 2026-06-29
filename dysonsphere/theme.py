@@ -230,6 +230,7 @@ def _dysonsphere_theme():
             "boxplot": {
                 "size": opts["markSize"] * 0.8,
                 "ticks": {
+                    "cornerRadius": opts["markStrokeWidth"],
                     "fill": "white" if opts["darkmode"] else "black",
                     "size": opts["markSize"] * 0.6,
                     "thickness": opts["markStrokeWidth"],
