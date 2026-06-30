@@ -150,7 +150,7 @@ def _load_style_overrides(style: str | None) -> dict[str, Any]:
             style_found_in_config = True
 
     if style is not None and style not in _BUILTIN_STYLES and not style_found_in_config:
-        raise ValueError(f"Style {style!r} not found in built-in styles or any dysonsphere config file.")
+        raise ValueError(f"Style {style!r} not found as preset or any dysonsphere config file.")
 
     merged: dict[str, Any] = {}
     merged.update(default_cfg)
@@ -549,9 +549,7 @@ def _dysonsphere_theme() -> dict[str, Any]:
                 "continuousHeight": opts["chartHeight"],
                 "discreteWidth": opts["chartWidth"],
                 "discreteHeight": opts["chartHeight"],
-                "fill": None
-                if opts["darkmode"]
-                else opts["viewFill"],
+                "fill": None if opts["darkmode"] else opts["viewFill"],
                 "stroke": ("white" if opts["darkmode"] else "black") if opts["closed"] else None,
                 "strokeWidth": opts["axisWidth"],
             },
@@ -590,7 +588,7 @@ def create_config(directory: str | Path | None = None, *, persist: bool = False)
     lines = [
         "# dysonsphere.toml",
         "# Theme configuration for dysonsphere.",
-        "# Load a style with ds.theme(style=\"name\").",
+        '# Load a style with ds.theme(style="name").',
         "",
         "# Only the keys present in a section are applied - everything else uses",
         "# dysonsphere's built-in defaults. Unknown keys raise a ValueError immediately.",
@@ -616,12 +614,12 @@ def create_config(directory: str | Path | None = None, *, persist: bool = False)
         "",
         "[my_style]  # Rename to your desired style name",
         "",
-        "# Custom palettes — lists of hex strings, available via ds.palette(\"name\")",
-        "# or ds.theme(palette=\"name\"). dysonsphere palettes are typically 12 stops",
+        '# Custom palettes — lists of hex strings, available via ds.palette("name")',
+        '# or ds.theme(palette="name"). dysonsphere palettes are typically 12 stops',
         "# for sequential palettes, and 13 stops for diverging palettes.",
         "",
         "[palettes]",
-        "# my_palette = [\"#DFE9F7\", \"#C6D9F1\", \"#ADC8EC\", \"#94B8E6\", \"#7AA8E0\", \"#6097DA\", \"#4D87CA\", \"#4177B1\", \"#386898\", \"#2F597F\", \"#264A69\", \"#1D3A58\"]",
+        '# my_palette = ["#DFE9F7", "#C6D9F1", "#ADC8EC", "#94B8E6", "#7AA8E0", "#6097DA", "#4D87CA", "#4177B1", "#386898", "#2F597F", "#264A69", "#1D3A58"]',  # noqa: E501
     ]
 
     dest.parent.mkdir(parents=True, exist_ok=True)
