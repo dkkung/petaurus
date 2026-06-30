@@ -36,8 +36,7 @@ def _inject_png_metadata(png_bytes: bytes, description: str) -> bytes:
         b"\x00"  # compression flag: 0 (uncompressed)
         b"\x00"  # compression method: 0
         b"\x00"  # language tag: empty + null
-        b"\x00"  # translated keyword: empty + null
-        + description.encode("utf-8")
+        b"\x00" + description.encode("utf-8")  # translated keyword: empty + null
     )
     crc = zlib.crc32(chunk_type + data) & 0xFFFFFFFF
     chunk = struct.pack(">I", len(data)) + chunk_type + data + struct.pack(">I", crc)
@@ -200,7 +199,9 @@ def save(
         alt.theme.options["transparentBackground"] = original_transparent
 
 
-def _fix_tick_alignment(path: str, band_padding: float = 0.1, chart_width: float = 100.0, axis_offset: float = 0.0) -> None:
+def _fix_tick_alignment(
+    path: str, band_padding: float = 0.1, chart_width: float = 100.0, axis_offset: float = 0.0
+) -> None:
     """Move x-axis tick and grid lines from Vega's floor'd integer positions to exact mark centers.
 
     Vega snaps axis tick/grid group transforms to integers for crisp screen rendering but

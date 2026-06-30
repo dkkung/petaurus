@@ -116,7 +116,7 @@ class TestExportSwatches:
         content = (tmp_path / "import_dysonsphere_palettes_to_illustrator.jsx").read_text()
         assert '"blues"' in content
         assert '"reds"' in content
-        assert 'colorGroup.name = paletteName;' in content
+        assert "colorGroup.name = paletteName;" in content
         assert 'swatch.name = paletteName + " - "' in content
 
     def test_ase_signature_and_structure(self, tmp_path):
@@ -129,7 +129,7 @@ class TestExportSwatches:
         assert major == 1 and minor == 0
 
     def test_ase_contains_all_palettes(self, tmp_path):
-        from dysonsphere.palettes import colors, export_swatches, _write_ase
+        from dysonsphere.palettes import _write_ase, colors
 
         _write_ase(colors, tmp_path / "test.ase")
         raw = (tmp_path / "test.ase").read_bytes()

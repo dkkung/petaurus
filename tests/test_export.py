@@ -394,18 +394,15 @@ class TestFixTickAlignment:
         # Grid lines use translate(x,-chartHeight) not translate(x,0); both must be fixed.
         step = 200 / (3 + 0.1)
         x0, x1, x2 = int(step * 0.55), int(step * 1.55), int(step * 2.55)
-        lines = "".join(
-            f'<line transform="translate({x},-100)" x1="0" y1="0" x2="0" y2="100"/>'
-            for x in [x0, x1, x2]
-        )
+        lines = "".join(f'<line transform="translate({x},-100)" x1="0" y1="0" x2="0" y2="100"/>' for x in [x0, x1, x2])
         svg = f'<svg xmlns="{NS}"><g class="mark-rule role-axis-grid">{lines}</g></svg>'
         path = _write(tmp_path, "t.svg", svg)
         _fix_tick_alignment(path, band_padding=0.1, chart_width=200)
         root = ET.parse(path).getroot()
         xs = sorted(
-            float(re.match(r"translate\(([\d.]+),", line.get("transform", "")).group(1))
+            float(m.group(1))
             for line in root.iter(f"{{{NS}}}line")
-            if re.match(r"translate\(([\d.]+),", line.get("transform", ""))
+            if (m := re.match(r"translate\(([\d.]+),", line.get("transform", "")))
         )
         expected = [round(step * (0.55 + i), 4) for i in range(3)]
         assert xs == pytest.approx(expected, abs=0.001)
@@ -414,10 +411,7 @@ class TestFixTickAlignment:
         # axis_offset extends grid line y-span upward to eliminate the top-border gap.
         step = 200 / (3 + 0.1)
         x0, x1, x2 = int(step * 0.55), int(step * 1.55), int(step * 2.55)
-        lines = "".join(
-            f'<line transform="translate({x},-100)" x1="0" y1="0" x2="0" y2="100"/>'
-            for x in [x0, x1, x2]
-        )
+        lines = "".join(f'<line transform="translate({x},-100)" x1="0" y1="0" x2="0" y2="100"/>' for x in [x0, x1, x2])
         svg = f'<svg xmlns="{NS}"><g class="mark-rule role-axis-grid">{lines}</g></svg>'
         path = _write(tmp_path, "t.svg", svg)
         _fix_tick_alignment(path, band_padding=0.1, chart_width=200, axis_offset=3)
