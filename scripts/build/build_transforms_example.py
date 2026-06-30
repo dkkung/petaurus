@@ -9,13 +9,16 @@ Usage (from project root):
     uv run python scripts/build/build_transforms_example.py
 """
 
+import tempfile
 from pathlib import Path
 
 import altair as alt
 import numpy as np
 import polars as pl
+import vl_convert as vlc
 
 import dysonsphere as ds
+from dysonsphere.export import _fix_tick_alignment
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -39,7 +42,7 @@ df = pl.DataFrame(
     }
 )
 
-ds.theme(viewFill="white", palette="blues2", legend=False)
+ds.theme(chartFill="white", palette="blues2", legend=False)
 
 title_params = dict(orient="top", anchor="start", offset=4)
 fontSize = alt.theme.options.get("fontSize", 7)
@@ -77,5 +80,17 @@ right = (
 
 chart = alt.hconcat(left, right)
 
-ds.save(chart, str(ROOT / "docs" / "transforms_example"), background=["light"])
-print(f"saved {ROOT / 'docs' / 'transforms_example_light.png'}")
+out_png = ROOT / "docs" / "transforms_example_light.png"
+with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as tmp:
+    tmp_path = tmp.name
+chart.save(tmp_path)
+_fix_tick_alignment(
+    tmp_path,
+    band_padding=alt.theme.options.get("bandPadding", 0.1),
+    chart_width=alt.theme.options.get("chartWidth", 100),
+)
+with open(tmp_path, encoding="utf-8") as f:
+    svg_content = f.read()
+Path(tmp_path).unlink()
+out_png.write_bytes(vlc.svg_to_png(svg_content, ppi=1200))
+print(f"saved {out_png}")
