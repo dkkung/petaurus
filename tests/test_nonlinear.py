@@ -25,6 +25,7 @@ def log_df():
 @pytest.fixture
 def base_chart(log_df):
     import altair as alt
+
     return alt.Chart(log_df).mark_point().encode(y="v:Q")
 
 
@@ -100,6 +101,7 @@ class TestDeriveExp:
 class TestAddLogTicks:
     def test_returns_layer_chart(self, base_chart, log_df):
         import altair as alt
+
         result = add_log_ticks(base_chart, log_df, "v")
         assert isinstance(result, alt.LayerChart)
 
@@ -117,12 +119,14 @@ class TestAddLogTicks:
 
     def test_x_axis(self, log_df):
         import altair as alt
+
         chart = alt.Chart(log_df).mark_point().encode(x="v:Q")
         result = add_log_ticks(chart, log_df, "v", axis="x")
         assert isinstance(result, alt.LayerChart)
 
     def test_exp_override(self, base_chart, log_df):
         import altair as alt
+
         result = add_log_ticks(base_chart, log_df, "v", expMin=0, expMax=4)
         assert isinstance(result, alt.LayerChart)
 
@@ -130,6 +134,7 @@ class TestAddLogTicks:
 class TestAddPowTicks:
     def test_returns_layer_chart(self, base_chart, log_df):
         import altair as alt
+
         result = add_pow_ticks(base_chart, log_df, "v", majorValues=[0, 1, 4, 9, 16])
         assert isinstance(result, alt.LayerChart)
 

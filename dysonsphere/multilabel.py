@@ -221,15 +221,23 @@ def _multilabel_layer(
             )
 
     if style not in ("plusminus", "text", "symbol"):
-        raise ValueError(f"style must be 'plusminus', 'text', or 'symbol', got {style!r}")
+        raise ValueError(
+            f"style must be 'plusminus', 'text', or 'symbol', got {style!r}"
+        )
     if labelAlign not in ("left", "right"):
         raise ValueError(f"labelAlign must be 'left' or 'right', got {labelAlign!r}")
     if orientation not in ("vertical", "horizontal"):
-        raise ValueError(f"orientation must be 'vertical' or 'horizontal', got {orientation!r}")
+        raise ValueError(
+            f"orientation must be 'vertical' or 'horizontal', got {orientation!r}"
+        )
     if spanBracketStyle not in ("line", "bracket"):
-        raise ValueError(f"spanBracketStyle must be 'line' or 'bracket', got {spanBracketStyle!r}")
+        raise ValueError(
+            f"spanBracketStyle must be 'line' or 'bracket', got {spanBracketStyle!r}"
+        )
     if spanLabelPosition not in ("top", "bottom"):
-        raise ValueError(f"spanLabelPosition must be 'top' or 'bottom', got {spanLabelPosition!r}")
+        raise ValueError(
+            f"spanLabelPosition must be 'top' or 'bottom', got {spanLabelPosition!r}"
+        )
 
     # Normalise rowStyles to a dict so the rest of the code has a single code path.
     if isinstance(rowStyles, list):
@@ -280,9 +288,9 @@ def _multilabel_layer(
             )
         max_len = max(len(cat) for cat in categories)
         angle_rad = abs(math.radians(categoryLabelAngle))
-        tight_height = fontSize * 0.6 * max_len * math.sin(angle_rad) + fontSize * math.cos(
+        tight_height = fontSize * 0.6 * max_len * math.sin(
             angle_rad
-        )
+        ) + fontSize * math.cos(angle_rad)
         if categoryLabelHeight is None:
             categoryLabelHeight = math.ceil(tight_height)
         k = 0 if categoryLabelPosition == "top" else len(row_order)
@@ -294,7 +302,10 @@ def _multilabel_layer(
         # shifts the anchor into the label row so the gap is on the data side.
         extra = max(0.0, categoryLabelHeight - tight_height)
         if k == 0:
-            band_range = [categoryLabelHeight, len(row_order) * rowHeight + categoryLabelHeight]
+            band_range = [
+                categoryLabelHeight,
+                len(row_order) * rowHeight + categoryLabelHeight,
+            ]
             label_y = label_y_offset
         else:
             band_range = [0, len(row_order) * rowHeight]
@@ -400,7 +411,9 @@ def _multilabel_layer(
         if strokeWidth is None:
             strokeWidth = alt.theme.options.get("markStrokeWidth", 0.25)
 
-        plus_df = marks_df.filter(pl.col("__label").is_in(symbol_rows) & (pl.col("__value") == "+"))
+        plus_df = marks_df.filter(
+            pl.col("__label").is_in(symbol_rows) & (pl.col("__value") == "+")
+        )
         minus_df = marks_df.filter(
             pl.col("__label").is_in(symbol_rows) & (pl.col("__value") == "−")
         )
@@ -478,19 +491,35 @@ def _multilabel_layer(
                         if len(run) >= 2:
                             _id = f"{cat}_{run[0]}_{run[-1]}"
                             line_rows.append(
-                                {"__category": cat, "__label": row_order[run[0]], "__line_id": _id}
+                                {
+                                    "__category": cat,
+                                    "__label": row_order[run[0]],
+                                    "__line_id": _id,
+                                }
                             )
                             line_rows.append(
-                                {"__category": cat, "__label": row_order[run[-1]], "__line_id": _id}
+                                {
+                                    "__category": cat,
+                                    "__label": row_order[run[-1]],
+                                    "__line_id": _id,
+                                }
                             )
                         run = []
                 if len(run) >= 2:
                     _id = f"{cat}_{run[0]}_{run[-1]}"
                     line_rows.append(
-                        {"__category": cat, "__label": row_order[run[0]], "__line_id": _id}
+                        {
+                            "__category": cat,
+                            "__label": row_order[run[0]],
+                            "__line_id": _id,
+                        }
                     )
                     line_rows.append(
-                        {"__category": cat, "__label": row_order[run[-1]], "__line_id": _id}
+                        {
+                            "__category": cat,
+                            "__label": row_order[run[-1]],
+                            "__line_id": _id,
+                        }
                     )
 
         if connectingLine and line_rows:
@@ -561,7 +590,12 @@ def _multilabel_layer(
             tick_below_h = spanTickHeight if is_bracket_down else 0.0
             label_y = span_y + tick_below_h + label_gap if has_any_label else 0.0
             label_baseline = "top"
-            chart_h = span_y + tick_below_h + (fontSize + label_gap if has_any_label else 0.0) + 2.0
+            chart_h = (
+                span_y
+                + tick_below_h
+                + (fontSize + label_gap if has_any_label else 0.0)
+                + 2.0
+            )
         else:  # top
             label_baseline = "top"
             if has_any_label:
@@ -583,7 +617,9 @@ def _multilabel_layer(
             indices = []
             for cat in span_cats:
                 if cat not in categories:
-                    raise ValueError(f"span[{span_lbl!r}]: {cat!r} is not in categories")
+                    raise ValueError(
+                        f"span[{span_lbl!r}]: {cat!r} is not in categories"
+                    )
                 indices.append(categories.index(cat))
             i_start, i_end = min(indices), max(indices)
 
@@ -594,7 +630,9 @@ def _multilabel_layer(
             # Rule — alt.value() for all positions so no :Q scale is added to the layer
             layers.append(
                 alt.Chart(_one_row)
-                .mark_rule(color=span_color, strokeWidth=axisWidth_val, strokeDash=[0, 0])
+                .mark_rule(
+                    color=span_color, strokeWidth=axisWidth_val, strokeDash=[0, 0]
+                )
                 .encode(x=alt.value(x1), x2=alt.value(x2), y=alt.value(span_y))
             )
 
@@ -603,7 +641,11 @@ def _multilabel_layer(
                 for tick_x in (x1, x2):
                     layers.append(
                         alt.Chart(_one_row)
-                        .mark_rule(color=span_color, strokeWidth=axisWidth_val, strokeDash=[0, 0])
+                        .mark_rule(
+                            color=span_color,
+                            strokeWidth=axisWidth_val,
+                            strokeDash=[0, 0],
+                        )
                         .encode(
                             x=alt.value(tick_x),
                             y=alt.value(tick_y_start),
@@ -617,10 +659,16 @@ def _multilabel_layer(
                 layers.append(
                     alt.Chart(lbl_df)
                     .mark_text(
-                        fontSize=fontSize, color=span_color,
-                        baseline=label_baseline, align="center",
+                        fontSize=fontSize,
+                        color=span_color,
+                        baseline=label_baseline,
+                        align="center",
                     )
-                    .encode(x=alt.value(x_mid), y=alt.value(label_y), text=alt.Text("__slabel:N"))
+                    .encode(
+                        x=alt.value(x_mid),
+                        y=alt.value(label_y),
+                        text=alt.Text("__slabel:N"),
+                    )
                 )
 
     if defer_cat_label:
@@ -638,9 +686,12 @@ def _multilabel_layer(
             .encode(x=x_enc, y=alt.value(label_y), text=alt.Text("__category:N"))
         )
 
-    return cast(alt.LayerChart, alt.layer(*layers).properties(
-        width=chartWidth, height=chart_h, view={"fill": None, "stroke": None}
-    ))
+    return cast(
+        alt.LayerChart,
+        alt.layer(*layers).properties(
+            width=chartWidth, height=chart_h, view={"fill": None, "stroke": None}
+        ),
+    )
 
 
 def add_multilabel(

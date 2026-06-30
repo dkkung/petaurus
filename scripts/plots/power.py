@@ -23,7 +23,11 @@ for body in BODIES:
         T_true = 2 * math.pi * math.sqrt(L / g)
         for _ in range(N_REPS):
             rows.append(
-                {"body": body, "length": float(L), "period": float(T_true * rng.lognormal(0, 0.03))}
+                {
+                    "body": body,
+                    "length": float(L),
+                    "period": float(T_true * rng.lognormal(0, 0.03)),
+                }
             )
 
 df = pl.DataFrame(rows)
@@ -61,7 +65,9 @@ trend = (
 )
 
 chart = points + trend
-chart = ds.add_pow_ticks(chart, df, "length", axis="x", exponent=0.5, majorValues=major_values)
+chart = ds.add_pow_ticks(
+    chart, df, "length", axis="x", exponent=0.5, majorValues=major_values
+)
 
 ds.save(chart, "power")
 print("saved power")

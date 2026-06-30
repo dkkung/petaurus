@@ -18,9 +18,21 @@ for group in GROUPS:
         followup = float(baseline + effect + rng.normal(0, 8))
         subject = f"{group[0]}{i + 1:02d}"
         rows.append(
-            {"subject": subject, "group": group, "condition": "Baseline", "value": baseline}
+            {
+                "subject": subject,
+                "group": group,
+                "condition": "Baseline",
+                "value": baseline,
+            }
         )
-        rows.append({"subject": subject, "group": group, "condition": "Week 12", "value": followup})
+        rows.append(
+            {
+                "subject": subject,
+                "group": group,
+                "condition": "Week 12",
+                "value": followup,
+            }
+        )
 
 df = pl.DataFrame(rows)
 

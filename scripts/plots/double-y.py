@@ -14,7 +14,20 @@ import polars as pl
 
 import dysonsphere as ds
 
-MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+MONTHS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+]
 
 temp = [2.1, 3.4, 7.2, 11.8, 16.3, 19.8, 22.1, 21.5, 17.4, 12.0, 6.8, 3.2]
 precip = [52, 40, 45, 48, 55, 60, 65, 62, 58, 70, 68, 55]

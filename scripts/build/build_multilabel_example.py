@@ -28,7 +28,9 @@ CATEGORIES = ["Control", "Drug A", "Drug B", "Drug C"]
 rng = np.random.default_rng(42)
 df = pl.DataFrame(
     {
-        "group": (["Control"] * 38 + ["Drug A"] * 45 + ["Drug B"] * 52 + ["Drug C"] * 41),
+        "group": (
+            ["Control"] * 38 + ["Drug A"] * 45 + ["Drug B"] * 52 + ["Drug C"] * 41
+        ),
         "value": np.concatenate(
             [
                 rng.normal(1.0, 0.1, 38),
@@ -62,7 +64,9 @@ def corner_label(base: alt.LayerChart, text: str) -> alt.LayerChart:
     lines = text.split("\n")
     label = (
         alt.Chart(alt.Data(values=[{}]))
-        .mark_text(align="left", baseline="top", text=lines if len(lines) > 1 else lines[0])
+        .mark_text(
+            align="left", baseline="top", text=lines if len(lines) > 1 else lines[0]
+        )
         .encode(x=alt.value(4), y=alt.value(4))
     )
     return base + label

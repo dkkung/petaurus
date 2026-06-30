@@ -88,10 +88,13 @@ left = (left_base + ds.add_pvalue(**pvalue_kwargs, labelStyle="p")).properties(
     )
 )
 right = (
-    right_base + ds.add_pvalue(**pvalue_kwargs, labelStyle="asterisks", bracketStyle="bracket")
+    right_base
+    + ds.add_pvalue(**pvalue_kwargs, labelStyle="asterisks", bracketStyle="bracket")
 ).properties(
     title=alt.TitleParams(
-        ['labelStyle="asterisks"', 'bracketStyle="bracket"'], fontSize=fontSize, **title_params
+        ['labelStyle="asterisks"', 'bracketStyle="bracket"'],
+        fontSize=fontSize,
+        **title_params,
     )
 )
 

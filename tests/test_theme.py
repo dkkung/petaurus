@@ -1,7 +1,12 @@
 import altair as alt
 import pytest
 
-from dysonsphere.theme import _dysonsphere_theme, _load_style_overrides, create_config, theme
+from dysonsphere.theme import (
+    _dysonsphere_theme,
+    _load_style_overrides,
+    create_config,
+    theme,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -67,6 +72,7 @@ class TestThemeDefaults:
     def test_palette_string_resolved_to_list(self):
         theme(palette="blues")
         from dysonsphere.palettes import colors
+
         assert alt.theme.options["palette"] == colors["blues"]
 
     def test_palette_unknown_string_passed_through(self):
@@ -123,7 +129,9 @@ class TestStyleLoading:
 
     def test_missing_style_raises(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        (tmp_path / "dysonsphere.toml").write_text("[my_style]\nfontSize = 6\n", encoding="utf-8")
+        (tmp_path / "dysonsphere.toml").write_text(
+            "[my_style]\nfontSize = 6\n", encoding="utf-8"
+        )
         with pytest.raises(ValueError, match="'missing'"):
             _load_style_overrides("missing")
 
@@ -194,6 +202,7 @@ class TestCustomPalettes:
         )
         theme()
         from dysonsphere.palettes import colors
+
         assert "my_pal" in colors
         assert colors["my_pal"] == ["#ff0000", "#00ff00", "#0000ff"]
 
@@ -204,6 +213,7 @@ class TestCustomPalettes:
         )
         theme()
         from dysonsphere.palettes import colors
+
         assert "my_pal" in colors
         monkeypatch.chdir("/")
         theme()

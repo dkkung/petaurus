@@ -11,12 +11,12 @@ Usage (from project root):
 
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import altair as alt
 import numpy as np
 import polars as pl
 import vl_convert as vlc
-from typing import Any
 
 import dysonsphere as ds
 from dysonsphere.export import _fix_tick_alignment
@@ -28,9 +28,7 @@ CATEGORIES = ["A", "B", "C", "D", "E"]
 rng = np.random.default_rng(42)
 df = pl.DataFrame(
     {
-        "group": (
-            ["A"] * 100 + ["B"] * 100 + ["C"] * 100 + ["D"] * 100 + ["E"] * 100
-        ),
+        "group": (["A"] * 100 + ["B"] * 100 + ["C"] * 100 + ["D"] * 100 + ["E"] * 100),
         "value": np.concatenate(
             [
                 rng.normal(10, 2, 100),
@@ -51,7 +49,9 @@ palette = ds.palette("blues2", n=len(CATEGORIES))
 
 x = alt.X("group:N", sort=CATEGORIES, title=None)
 y = alt.Y("value:Q", title=None)
-color = alt.Color("group:N", sort=CATEGORIES, scale=alt.Scale(range=palette), legend=None)
+color = alt.Color(
+    "group:N", sort=CATEGORIES, scale=alt.Scale(range=palette), legend=None
+)
 
 # -- Left: add_beeswarm() ---------------------------------------------------
 bee_df = ds.add_beeswarm(df, yCol="value", groupBy=["group"])
@@ -61,7 +61,9 @@ left = (
     .mark_circle()
     .encode(x=x, y=y, xOffset=alt.XOffset("beeswarm_x:Q"), color=color)
     .properties(
-        title=alt.TitleParams(["add_beeswarm(df, ...)"], fontSize=fontSize, **title_params)
+        title=alt.TitleParams(
+            ["add_beeswarm(df, ...)"], fontSize=fontSize, **title_params
+        )
     )
 )
 

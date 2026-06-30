@@ -68,18 +68,26 @@ def _x_minor_positions(path, minor_size):
 
 
 def _y_tick_svg(major_ys, minor_ys, major_size=5, minor_size=3):
-    lines = [f'  <line transform="translate(0,{y})" x1="0" y1="0" x2="-{major_size}" y2="0"/>'
-             for y in major_ys]
-    lines += [f'  <line transform="translate(0,{y})" x1="0" y1="0" x2="-{minor_size}" y2="0"/>'
-              for y in minor_ys]
+    lines = [
+        f'  <line transform="translate(0,{y})" x1="0" y1="0" x2="-{major_size}" y2="0"/>'
+        for y in major_ys
+    ]
+    lines += [
+        f'  <line transform="translate(0,{y})" x1="0" y1="0" x2="-{minor_size}" y2="0"/>'
+        for y in minor_ys
+    ]
     return f'<svg xmlns="{NS}">\n' + "\n".join(lines) + "\n</svg>"
 
 
 def _x_tick_svg(major_xs, minor_xs, major_size=5, minor_size=3):
-    lines = [f'  <line transform="translate({x},0)" x1="0" y1="0" x2="0" y2="{major_size}"/>'
-             for x in major_xs]
-    lines += [f'  <line transform="translate({x},0)" x1="0" y1="0" x2="0" y2="{minor_size}"/>'
-              for x in minor_xs]
+    lines = [
+        f'  <line transform="translate({x},0)" x1="0" y1="0" x2="0" y2="{major_size}"/>'
+        for x in major_xs
+    ]
+    lines += [
+        f'  <line transform="translate({x},0)" x1="0" y1="0" x2="0" y2="{minor_size}"/>'
+        for x in minor_xs
+    ]
     return f'<svg xmlns="{NS}">\n' + "\n".join(lines) + "\n</svg>"
 
 
@@ -129,11 +137,17 @@ class TestSave:
         assert (tmp_path / "out_vegalite.json").exists()
 
     def test_vega_spec_skipped(self, simple_chart, tmp_path):
-        save(simple_chart, str(tmp_path / "out"), saveVegaSpec=False, background=["light"])
+        save(
+            simple_chart,
+            str(tmp_path / "out"),
+            saveVegaSpec=False,
+            background=["light"],
+        )
         assert not (tmp_path / "out_vegalite.json").exists()
 
     def test_layer_chart(self, tmp_path):
         from typing import cast
+
         df = pl.DataFrame({"x": ["A", "B"], "y": [1.0, 2.0]})
         base = alt.Chart(df).mark_point().encode(x="x:N", y="y:Q")
         layer = cast(alt.LayerChart, alt.layer(base))
@@ -155,7 +169,13 @@ class TestSave:
         assert (tmp_path / "out_light.png").exists()
 
     def test_facet_chart(self, tmp_path):
-        df = pl.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "y": [1.0, 2.0, 3.0, 4.0], "facet": ["A", "A", "B", "B"]})
+        df = pl.DataFrame(
+            {
+                "x": [1.0, 2.0, 3.0, 4.0],
+                "y": [1.0, 2.0, 3.0, 4.0],
+                "facet": ["A", "A", "B", "B"],
+            }
+        )
         facet = alt.Chart(df).mark_point().encode(x="x:Q", y="y:Q").facet("facet:N")
         save(facet, str(tmp_path / "out"), background=["light"])
         assert (tmp_path / "out_light.png").exists()
@@ -196,11 +216,22 @@ class TestSave:
         assert (tmp_path / "out_light.png").stat().st_size > 100
 
     def test_description_in_spec(self, simple_chart, tmp_path):
-        save(simple_chart, str(tmp_path / "out"), description="my chart", background=["light"])
+        save(
+            simple_chart,
+            str(tmp_path / "out"),
+            description="my chart",
+            background=["light"],
+        )
         assert "my chart" in (tmp_path / "out_vegalite.json").read_text()
 
     def test_description_in_svg(self, simple_chart, tmp_path):
-        save(simple_chart, str(tmp_path / "out"), description="my chart", saveMetadata=False, background=["light"])
+        save(
+            simple_chart,
+            str(tmp_path / "out"),
+            description="my chart",
+            saveMetadata=False,
+            background=["light"],
+        )
         assert "<desc>my chart</desc>" in (tmp_path / "out_light.svg").read_text()
 
     def test_save_metadata_on_by_default(self, simple_chart, tmp_path):
@@ -209,15 +240,24 @@ class TestSave:
         assert "Generated with" in spec
 
     def test_save_metadata_can_be_disabled(self, simple_chart, tmp_path):
-        save(simple_chart, str(tmp_path / "out"), saveMetadata=False, background=["light"])
+        save(
+            simple_chart,
+            str(tmp_path / "out"),
+            saveMetadata=False,
+            background=["light"],
+        )
         spec = (tmp_path / "out_vegalite.json").read_text()
         assert "Generated with" not in spec
 
     def test_save_metadata_in_spec(self, simple_chart, tmp_path):
-        import altair as alt
         import importlib.metadata
         import sys
-        save(simple_chart, str(tmp_path / "out"), saveMetadata=True, background=["light"])
+
+        import altair as alt
+
+        save(
+            simple_chart, str(tmp_path / "out"), saveMetadata=True, background=["light"]
+        )
         spec = (tmp_path / "out_vegalite.json").read_text()
         assert f"altair {alt.__version__}" in spec
         assert f"dysonsphere {importlib.metadata.version('dysonsphere')}" in spec
@@ -225,23 +265,39 @@ class TestSave:
         assert "UTC" in spec
 
     def test_save_metadata_in_svg(self, simple_chart, tmp_path):
-        save(simple_chart, str(tmp_path / "out"), saveMetadata=True, background=["light"])
+        save(
+            simple_chart, str(tmp_path / "out"), saveMetadata=True, background=["light"]
+        )
         svg = (tmp_path / "out_light.svg").read_text()
         assert "<desc>" in svg
         assert "altair" in svg
         assert "UTC" in svg
 
     def test_save_metadata_appended_to_description(self, simple_chart, tmp_path):
-        save(simple_chart, str(tmp_path / "out"), description="Figure 1", saveMetadata=True, background=["light"])
+        save(
+            simple_chart,
+            str(tmp_path / "out"),
+            description="Figure 1",
+            saveMetadata=True,
+            background=["light"],
+        )
         import json
+
         desc = json.loads((tmp_path / "out_vegalite.json").read_text())["description"]
         assert "Figure 1" in desc
         assert "Generated with" in desc
         assert "altair" in desc
 
     def test_save_metadata_description_order(self, simple_chart, tmp_path):
-        save(simple_chart, str(tmp_path / "out"), description="Figure 1", saveMetadata=True, background=["light"])
+        save(
+            simple_chart,
+            str(tmp_path / "out"),
+            description="Figure 1",
+            saveMetadata=True,
+            background=["light"],
+        )
         import json
+
         desc = json.loads((tmp_path / "out_vegalite.json").read_text())["description"]
         assert desc.index("Figure 1") < desc.index("Generated with")
 
@@ -293,7 +349,9 @@ class TestFixTickAlignment:
         step_pi = W / (n + bp)
         ints0 = [int(step0 * (bp + i + 0.5)) for i in range(n)]
         ints_pi = [int(step_pi * (i + 0.5 + bp / 2)) for i in range(n)]
-        assert ints0 == ints_pi, "precondition: both cases must floor to same ints for this test"
+        assert ints0 == ints_pi, (
+            "precondition: both cases must floor to same ints for this test"
+        )
 
         lines = "".join(
             f'<line transform="translate({x},0)" x1="0" y1="0" x2="0" y2="-3"/>'
@@ -312,7 +370,6 @@ class TestFixTickAlignment:
         W = 100
         n = 6
         step0 = W / (n + 2 * bp)
-        step_pi = W / (n + bp)
         ints = [int(step0 * (bp + i + 0.5)) for i in range(n)]  # same for both formulas
 
         lines = "".join(
@@ -321,7 +378,7 @@ class TestFixTickAlignment:
         )
         # Box marks at Case 0 centers: M(center-3),y L(center+3),y ...
         box_marks = "".join(
-            f'<path aria-roledescription="box" d="M{step0*(bp+i+0.5)-3},10L{step0*(bp+i+0.5)+3},10"/>'
+            f'<path aria-roledescription="box" d="M{step0 * (bp + i + 0.5) - 3},10L{step0 * (bp + i + 0.5) + 3},10"/>'
             for i in range(n)
         )
         svg = (
@@ -341,7 +398,6 @@ class TestFixTickAlignment:
         bp = 0.1
         W = 100
         n = 6
-        step0 = W / (n + 2 * bp)
         step_pi = W / (n + bp)
         ints = [int(step_pi * (i + 0.5 + bp / 2)) for i in range(n)]
 
@@ -350,7 +406,9 @@ class TestFixTickAlignment:
             for x in ints
         )
         box_marks = "".join(
-            f'<path aria-roledescription="box" d="M{step_pi*(i+0.5+bp/2)-3},10L{step_pi*(i+0.5+bp/2)+3},10"/>'
+            f'<path aria-roledescription="box"'
+            f' d="M{step_pi * (i + 0.5 + bp / 2) - 3},10'
+            f'L{step_pi * (i + 0.5 + bp / 2) + 3},10"/>'
             for i in range(n)
         )
         svg = (
@@ -464,8 +522,10 @@ class TestLayerAxesToFront:
         _layer_axes_to_front(path)
         root = ET.parse(path).getroot()
         paths = list(root.iter(f"{{{NS}}}path"))
-        assert any(p.get("stroke") == "none" for p in paths)  # original → stroke removed
-        assert any(p.get("fill") == "none" for p in paths)    # clone → fill=none
+        assert any(
+            p.get("stroke") == "none" for p in paths
+        )  # original → stroke removed
+        assert any(p.get("fill") == "none" for p in paths)  # clone → fill=none
 
 
 # ── _simplify_svg() ──────────────────────────────────────────────────────────

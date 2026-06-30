@@ -6,7 +6,9 @@ from dysonsphere.utils import count_n, ensure_polars
 
 @pytest.fixture
 def simple_df():
-    return pl.DataFrame({"group": ["A", "A", "B", "B", "B"], "value": [1.0, 2.0, 3.0, 4.0, 5.0]})
+    return pl.DataFrame(
+        {"group": ["A", "A", "B", "B", "B"], "value": [1.0, 2.0, 3.0, 4.0, 5.0]}
+    )
 
 
 class TestEnsurePolars:
@@ -15,7 +17,9 @@ class TestEnsurePolars:
         assert result is simple_df
 
     def test_invalid_type_raises(self):
-        with pytest.raises(TypeError, match="Expected a polars.DataFrame or pandas.DataFrame"):
+        with pytest.raises(
+            TypeError, match="Expected a polars.DataFrame or pandas.DataFrame"
+        ):
             ensure_polars("not a dataframe")  # ty: ignore[invalid-argument-type]
 
     def test_invalid_type_dict_raises(self):
@@ -35,4 +39,3 @@ class TestCountN:
 
     def test_empty_categories(self, simple_df):
         assert count_n(simple_df, "group", []) == []
-

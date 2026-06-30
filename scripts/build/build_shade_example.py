@@ -82,8 +82,18 @@ scatter = (
     alt.Chart(scatter_df)
     .mark_point()
     .encode(
-        x=alt.X("x:Q", title=None, scale=alt.Scale(domain=[0, 10]), axis=alt.Axis(tickCount=5)),
-        y=alt.Y("y:Q", title=None, scale=alt.Scale(domain=[0, 10]), axis=alt.Axis(tickCount=5)),
+        x=alt.X(
+            "x:Q",
+            title=None,
+            scale=alt.Scale(domain=[0, 10]),
+            axis=alt.Axis(tickCount=5),
+        ),
+        y=alt.Y(
+            "y:Q",
+            title=None,
+            scale=alt.Scale(domain=[0, 10]),
+            axis=alt.Axis(tickCount=5),
+        ),
         color=alt.Color(
             "y:Q",
             scale=alt.Scale(range=ds.palette("blues2"), domain=[0, 10]),

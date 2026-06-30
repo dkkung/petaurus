@@ -6,12 +6,34 @@ from dysonsphere.palettes import colors, palette
 
 HEX_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
-SEQUENTIAL = ["blues", "greens", "reds", "greys", "yellows", "cyans", "magentas",
-              "purples", "lavenders", "violets", "oranges", "browns", "pinks", "neongreens"]
+SEQUENTIAL = [
+    "blues",
+    "greens",
+    "reds",
+    "greys",
+    "yellows",
+    "cyans",
+    "magentas",
+    "purples",
+    "lavenders",
+    "violets",
+    "oranges",
+    "browns",
+    "pinks",
+    "neongreens",
+]
 SEQUENTIAL_2 = [f"{n}2" for n in SEQUENTIAL]
 SEQUENTIAL_3 = [f"{n}3" for n in SEQUENTIAL]
-DIVERGING = ["redsblues", "purplesgreens", "greensblues", "redsblues2", "redsblues3",
-             "greyspinks", "greyspinks2", "greyspinks3"]
+DIVERGING = [
+    "redsblues",
+    "purplesgreens",
+    "greensblues",
+    "redsblues2",
+    "redsblues3",
+    "greyspinks",
+    "greyspinks2",
+    "greyspinks3",
+]
 
 
 def test_all_hex_values_valid():
@@ -76,18 +98,23 @@ def test_palette_unknown_key_raises():
 class TestExportSwatches:
     def test_creates_jsx_file(self, tmp_path):
         from dysonsphere.palettes import export_swatches
+
         export_swatches(tmp_path)
         assert (tmp_path / "import_dysonsphere_palettes_to_illustrator.jsx").exists()
 
     def test_jsx_contains_palette_names(self, tmp_path):
         from dysonsphere.palettes import export_swatches
+
         export_swatches(tmp_path)
-        content = (tmp_path / "import_dysonsphere_palettes_to_illustrator.jsx").read_text()
+        content = (
+            tmp_path / "import_dysonsphere_palettes_to_illustrator.jsx"
+        ).read_text()
         assert '"blues"' in content
         assert '"reds"' in content
 
     def test_defaults_to_cwd(self, tmp_path, monkeypatch):
         from dysonsphere.palettes import export_swatches
+
         monkeypatch.chdir(tmp_path)
         export_swatches()
         assert (tmp_path / "import_dysonsphere_palettes_to_illustrator.jsx").exists()

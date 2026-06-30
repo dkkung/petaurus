@@ -7,7 +7,6 @@ Usage (from project root):
     uv run python scripts/examples/text.py
 """
 
-import altair as alt
 import numpy as np
 import polars as pl
 

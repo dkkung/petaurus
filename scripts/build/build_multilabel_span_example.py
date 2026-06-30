@@ -10,12 +10,12 @@ Usage (from project root):
 
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import altair as alt
 import numpy as np
 import polars as pl
 import vl_convert as vlc
-from typing import Any
 
 import dysonsphere as ds
 from dysonsphere.export import _fix_tick_alignment
@@ -27,7 +27,12 @@ rng = np.random.default_rng(42)
 df = pl.DataFrame(
     {
         "group": (
-            ["A"] * 200 + ["B"] * 200 + ["C"] * 200 + ["D"] * 200 + ["E"] * 200 + ["F"] * 200
+            ["A"] * 200
+            + ["B"] * 200
+            + ["C"] * 200
+            + ["D"] * 200
+            + ["E"] * 200
+            + ["F"] * 200
         ),
         "value": np.concatenate(
             [
@@ -60,7 +65,9 @@ base = alt.Chart(df).encode(
 )
 
 boxplot = base.mark_boxplot().encode(
-    color=alt.Color("group:N", sort=CATEGORIES, scale=alt.Scale(range=palette), legend=None),
+    color=alt.Color(
+        "group:N", sort=CATEGORIES, scale=alt.Scale(range=palette), legend=None
+    ),
 )
 
 points = base.mark_circle().encode(

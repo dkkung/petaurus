@@ -17,10 +17,12 @@ def default_theme():
 @pytest.fixture
 def group_df():
     rng = np.random.default_rng(0)
-    return pl.DataFrame({
-        "group": CATEGORIES * 15,
-        "value": rng.normal(0, 1, 30),
-    })
+    return pl.DataFrame(
+        {
+            "group": CATEGORIES * 15,
+            "value": rng.normal(0, 1, 30),
+        }
+    )
 
 
 class TestFormatPvalue:
@@ -79,12 +81,16 @@ class TestAddPvalue:
         assert isinstance(result, alt.LayerChart)
 
     def test_multiple_pairs(self, group_df):
-        df = pl.DataFrame({
-            "group": ["A"] * 10 + ["B"] * 10 + ["C"] * 10,
-            "value": np.random.default_rng(1).normal(0, 1, 30),
-        })
+        df = pl.DataFrame(
+            {
+                "group": ["A"] * 10 + ["B"] * 10 + ["C"] * 10,
+                "value": np.random.default_rng(1).normal(0, 1, 30),
+            }
+        )
         result = add_pvalue(
-            df, "group", "value",
+            df,
+            "group",
+            "value",
             [("A", "B"), ("B", "C")],
             pvalues=[0.01, 0.05],
         )
@@ -92,8 +98,12 @@ class TestAddPvalue:
 
     def test_asterisk_label_style(self, group_df):
         result = add_pvalue(
-            group_df, "group", "value", [("A", "B")],
-            pvalues=[0.001], labelStyle="asterisks",
+            group_df,
+            "group",
+            "value",
+            [("A", "B")],
+            pvalues=[0.001],
+            labelStyle="asterisks",
         )
         assert isinstance(result, alt.LayerChart)
 

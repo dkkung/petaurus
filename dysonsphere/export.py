@@ -95,7 +95,9 @@ def save(
     if saveMetadata:
         try:
             _shell = get_ipython().__class__.__name__  # ty: ignore[unresolved-reference]
-            _script = "<jupyter-notebook>" if _shell == "ZMQInteractiveShell" else "<ipython>"
+            _script = (
+                "<jupyter-notebook>" if _shell == "ZMQInteractiveShell" else "<ipython>"
+            )
         except NameError:
             _script = Path(sys.argv[0]).name or "<unknown-script>"
         try:
@@ -105,8 +107,13 @@ def save(
         _py_ver = sys.version.split()[0]
         _timestamp = datetime.now(timezone.utc).strftime("%Y%m%d at %H:%M:%S UTC")
         _ds_ver = importlib.metadata.version("dysonsphere")
-        _meta = f"Generated with {_script} by {_user} using Python {_py_ver} on {_timestamp} using altair {alt.__version__} / dysonsphere {_ds_ver}."
-        _effective_desc: str | None = f"{description}\n{_meta}" if description is not None else _meta
+        _meta = (
+            f"Generated with {_script} by {_user} using Python {_py_ver}"
+            f" on {_timestamp} using altair {alt.__version__} / dysonsphere {_ds_ver}."
+        )
+        _effective_desc: str | None = (
+            f"{description}\n{_meta}" if description is not None else _meta
+        )
     else:
         _effective_desc = description
 
@@ -117,7 +124,11 @@ def save(
     # darkmode value that was just toggled above.
     def _resolve() -> _AltairChart:
         c = cast(_AltairChart, chart() if callable(chart) else chart)  # ty: ignore[call-top-callable]
-        return c.properties(description=_effective_desc) if _effective_desc is not None else c
+        return (
+            c.properties(description=_effective_desc)
+            if _effective_desc is not None
+            else c
+        )
 
     base = Path(filename)
     original_darkmode = alt.theme.options.get("darkmode", False)
@@ -132,7 +143,9 @@ def save(
         _background_map = {"light": (False, "_light"), "dark": (True, "_dark")}
         invalid = [b for b in background if b not in _background_map]
         if invalid:
-            raise ValueError(f"background must contain 'light' and/or 'dark', got {invalid!r}")
+            raise ValueError(
+                f"background must contain 'light' and/or 'dark', got {invalid!r}"
+            )
 
         alt.theme.options["transparentBackground"] = True
         for mode, suffix in [_background_map[b] for b in background]:
@@ -152,7 +165,9 @@ def save(
                 svg_content = f.read()
             if _effective_desc is not None:
                 escaped = html.escape(_effective_desc)
-                svg_content = re.sub(r"(<svg[^>]*>)", rf"\1<desc>{escaped}</desc>", svg_content, count=1)
+                svg_content = re.sub(
+                    r"(<svg[^>]*>)", rf"\1<desc>{escaped}</desc>", svg_content, count=1
+                )
                 Path(svg_path).write_text(svg_content, encoding="utf-8")
             png_path = str(base.parent / f"{base.name}{suffix}.png")
             Path(png_path).write_bytes(vlc.svg_to_png(svg_content, ppi=ppi))
@@ -161,7 +176,9 @@ def save(
         alt.theme.options["transparentBackground"] = original_transparent
 
 
-def _fix_tick_alignment(path: str, band_padding: float = 0.1, chart_width: float = 100.0) -> None:
+def _fix_tick_alignment(
+    path: str, band_padding: float = 0.1, chart_width: float = 100.0
+) -> None:
     """Move x-axis tick lines from Vega's floor'd integer positions to exact mark centers.
 
     Vega snaps axis tick group transforms to integers for crisp screen rendering but
@@ -291,7 +308,8 @@ def _fix_tick_alignment(path: str, band_padding: float = 0.1, chart_width: float
                 for i, b in enumerate(sorted_box)
             )
             z0_err = sum(
-                abs(b - step0 * (band_padding + i + 0.5)) for i, b in enumerate(sorted_box)
+                abs(b - step0 * (band_padding + i + 0.5))
+                for i, b in enumerate(sorted_box)
             )
             if pi_err < z0_err:
                 center_map = {
@@ -310,10 +328,13 @@ def _fix_tick_alignment(path: str, band_padding: float = 0.1, chart_width: float
             }
         elif actual_int == expected0:
             center_map = {
-                t: round(step0 * (band_padding + i + 0.5), 4) for i, t in enumerate(sorted_ticks)
+                t: round(step0 * (band_padding + i + 0.5), 4)
+                for i, t in enumerate(sorted_ticks)
             }
         elif actual_int == expected_pt:
-            center_map = {t: round(step_pt * (0.5 + i), 4) for i, t in enumerate(sorted_ticks)}
+            center_map = {
+                t: round(step_pt * (0.5 + i), 4) for i, t in enumerate(sorted_ticks)
+            }
         else:
             return
 
@@ -391,7 +412,9 @@ def _fix_log_minor_ticks(path: str) -> None:
 
     _TRANSLATE = re.compile(r"translate\(\s*([0-9.-]+)\s*[,\s]\s*([0-9.-]+)\s*\)")
 
-    def _correct_axis(major_positions: list[float], minor_els: list, is_x: bool) -> None:
+    def _correct_axis(
+        major_positions: list[float], minor_els: list, is_x: bool
+    ) -> None:
         nonlocal changed
         n = len(major_positions) - 1
         if n < 1 or not minor_els:
@@ -440,7 +463,9 @@ def _fix_log_minor_ticks(path: str) -> None:
                             mval = max(2, min(9, int(round(10 ** (1.0 - rel)))))
                             pos_ex = hi - math.log10(mval) * span
                         else:
-                            k = max(1, min(n_divs - 1, int(round((1.0 - rel) * n_divs))))
+                            k = max(
+                                1, min(n_divs - 1, int(round((1.0 - rel) * n_divs)))
+                            )
                             pos_ex = hi - (k / n_divs) * span
                         if abs(pos_ex - pos_int) > 0.001:
                             el.set("transform", f"translate(0,{pos_ex:.6f})")
@@ -548,7 +573,10 @@ def _layer_axes_to_front(path: str) -> None:
     ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
 
     def _is_grid_axis(el: ET.Element) -> bool:
-        return any(g.get("class", "") == "mark-rule role-axis-grid" for g in el.iter(f"{{{NS}}}g"))
+        return any(
+            g.get("class", "") == "mark-rule role-axis-grid"
+            for g in el.iter(f"{{{NS}}}g")
+        )
 
     tree = ET.parse(path)
     root = tree.getroot()
@@ -634,7 +662,9 @@ def _simplify_svg(path: str) -> None:
         if not effective:
             return True
         # translate(0,0) has no visual effect — safe to inline.
-        if effective == {"transform"} and _NOOP_TRANSLATE.match(child.get("transform", "")):
+        if effective == {"transform"} and _NOOP_TRANSLATE.match(
+            child.get("transform", "")
+        ):
             return True
         return False
 

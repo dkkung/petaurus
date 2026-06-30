@@ -121,7 +121,9 @@ def add_rule(
         # labelAlign: where along the line (x-axis): "left", "center", "right".
         # labelPosition: which side of the line (y-axis): "top", "bottom".
         df = pl.DataFrame({"__v": [float(v) for v in vals]})
-        rule = alt.Chart(df).mark_rule(**mark_kwargs).encode(y=alt.Y("__v:Q", title=None))
+        rule = (
+            alt.Chart(df).mark_rule(**mark_kwargs).encode(y=alt.Y("__v:Q", title=None))
+        )
         if label is None:
             return rule
 
@@ -136,7 +138,9 @@ def add_rule(
                 f"labelAlign must be 'left', 'center', or 'right' for axis='y', got {la!r}"
             )
         if lp not in ("top", "bottom"):
-            raise ValueError(f"labelPosition must be 'top' or 'bottom' for axis='y', got {lp!r}")
+            raise ValueError(
+                f"labelPosition must be 'top' or 'bottom' for axis='y', got {lp!r}"
+            )
 
         chart_width = alt.theme.options.get("chartWidth", 100)
         x_anchor = {"left": 0, "center": chart_width / 2, "right": chart_width}[la]
@@ -169,7 +173,9 @@ def add_rule(
         # labelAlign: where along the line (y-axis): "top", "center", "bottom".
         # labelPosition: which side of the line (x-axis): "right", "left".
         df = pl.DataFrame({"__v": [float(v) for v in vals]})
-        rule = alt.Chart(df).mark_rule(**mark_kwargs).encode(x=alt.X("__v:Q", title=None))
+        rule = (
+            alt.Chart(df).mark_rule(**mark_kwargs).encode(x=alt.X("__v:Q", title=None))
+        )
         if label is None:
             return rule
 
@@ -184,7 +190,9 @@ def add_rule(
                 f"labelAlign must be 'top', 'center', or 'bottom' for axis='x', got {la!r}"
             )
         if lp not in ("left", "right"):
-            raise ValueError(f"labelPosition must be 'left' or 'right' for axis='x', got {lp!r}")
+            raise ValueError(
+                f"labelPosition must be 'left' or 'right' for axis='x', got {lp!r}"
+            )
 
         chart_height = alt.theme.options.get("chartHeight", 100)
         y_anchor, vl_baseline = {
@@ -222,11 +230,26 @@ _TEXT_PRESETS: dict[str, dict] = {
     "topCenter": {"x_frac": 0.5, "y_frac": 0, "align": "center", "baseline": "top"},
     "topRight": {"x_frac": 1, "y_frac": 0, "align": "right", "baseline": "top"},
     "middleLeft": {"x_frac": 0, "y_frac": 0.5, "align": "left", "baseline": "middle"},
-    "middleCenter": {"x_frac": 0.5, "y_frac": 0.5, "align": "center", "baseline": "middle"},
+    "middleCenter": {
+        "x_frac": 0.5,
+        "y_frac": 0.5,
+        "align": "center",
+        "baseline": "middle",
+    },
     "middleRight": {"x_frac": 1, "y_frac": 0.5, "align": "right", "baseline": "middle"},
     "bottomLeft": {"x_frac": 0, "y_frac": 1, "align": "left", "baseline": "alphabetic"},
-    "bottomCenter": {"x_frac": 0.5, "y_frac": 1, "align": "center", "baseline": "alphabetic"},
-    "bottomRight": {"x_frac": 1, "y_frac": 1, "align": "right", "baseline": "alphabetic"},
+    "bottomCenter": {
+        "x_frac": 0.5,
+        "y_frac": 1,
+        "align": "center",
+        "baseline": "alphabetic",
+    },
+    "bottomRight": {
+        "x_frac": 1,
+        "y_frac": 1,
+        "align": "right",
+        "baseline": "alphabetic",
+    },
 }
 
 
@@ -365,7 +388,9 @@ def add_text(
         chart + ds.add_text("†", x=alt.value(60), y=alt.value(10))
     """
     if position is not None and position not in _TEXT_PRESETS:
-        raise ValueError(f"position must be one of {sorted(_TEXT_PRESETS)}, got {position!r}")
+        raise ValueError(
+            f"position must be one of {sorted(_TEXT_PRESETS)}, got {position!r}"
+        )
 
     # Resolve position — fills x/y/align/baseline only where not already provided
     if position is not None:
@@ -599,10 +624,16 @@ def add_shade(
 
     n_colors = len(palette)
     resolved_dash = (
-        alt.theme.options.get("dashedWidth", [2, 2]) if strokeDash is True else strokeDash
+        alt.theme.options.get("dashedWidth", [2, 2])
+        if strokeDash is True
+        else strokeDash
     )
     resolved_stroke_width = (
-        (strokeWidth if strokeWidth is not None else alt.theme.options.get("axisWidth", 0.25))
+        (
+            strokeWidth
+            if strokeWidth is not None
+            else alt.theme.options.get("axisWidth", 0.25)
+        )
         if stroke
         else 0
     )
@@ -630,7 +661,9 @@ def add_shade(
             chart_width = alt.theme.options.get("chartWidth", 100)
             chart_height = alt.theme.options.get("chartHeight", 100)
             n = len(categories) if categories else 0
-            cat_index = {cat: i for i, cat in enumerate(categories)} if categories else {}
+            cat_index = (
+                {cat: i for i, cat in enumerate(categories)} if categories else {}
+            )
             x_step = chart_width / (n + 2 * band_padding) if n else None
             y_step = chart_height / (n + 2 * band_padding) if n else None
             if flush is None:
@@ -651,7 +684,9 @@ def add_shade(
                     si, ei = cat_index[x_start], cat_index[x_end]
                     lo = 0 if (flush and si == 0) else x_step * (band_padding + si)
                     hi = (
-                        chart_width if (flush and ei == n - 1) else x_step * (band_padding + ei + 1)
+                        chart_width
+                        if (flush and ei == n - 1)
+                        else x_step * (band_padding + ei + 1)
                     )
                     enc["x"] = alt.value(lo)
                     enc["x2"] = alt.value(hi)
@@ -682,14 +717,18 @@ def add_shade(
                     enc["y2"] = alt.Y2("__y_end:Q")
 
                 df = pl.DataFrame(data_fields) if data_fields else dummy_df
-                layers.append(alt.Chart(df).mark_rect(**mark_kwargs, color=color).encode(**enc))
+                layers.append(
+                    alt.Chart(df).mark_rect(**mark_kwargs, color=color).encode(**enc)
+                )
 
         elif len(positions) > 0 and isinstance(positions[0][0], str):
             # String tuples: category names on a nominal axis.
             # Convert to pixel coordinates using the band scale formula so the
             # shade layer does not participate in scale merging.
             if categories is None:
-                raise ValueError("categories is required when positions contains string tuples.")
+                raise ValueError(
+                    "categories is required when positions contains string tuples."
+                )
             band_padding = alt.theme.options.get("bandPadding", 0.1)
             n = len(categories)
             span = (
@@ -714,7 +753,9 @@ def add_shade(
                     else {"x": alt.value(lo), "x2": alt.value(hi)}
                 )
                 layers.append(
-                    alt.Chart(dummy_df).mark_rect(**mark_kwargs, color=color).encode(**enc)
+                    alt.Chart(dummy_df)
+                    .mark_rect(**mark_kwargs, color=color)
+                    .encode(**enc)
                 )
 
         else:
@@ -722,7 +763,9 @@ def add_shade(
             # Encode as Q fields so the shade shares the main chart's scale.
             for k, (start, end) in enumerate(positions):
                 color = palette[k % n_colors]
-                pos_df = pl.DataFrame({"__start": [float(start)], "__end": [float(end)]})
+                pos_df = pl.DataFrame(
+                    {"__start": [float(start)], "__end": [float(end)]}
+                )
                 if axis == "y":
                     chart = (
                         alt.Chart(pos_df)
@@ -776,4 +819,3 @@ def add_shade(
         i = j
 
     return cast(alt.LayerChart, alt.layer(*run_layers))
-

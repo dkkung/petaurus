@@ -53,7 +53,9 @@ chart = (
     .mark_geoshape(stroke="white", strokeWidth=0.25)
     .transform_lookup(
         lookup="id",
-        from_=alt.LookupData(data=county_pop, key="id", fields=["county", "state", "population"]),
+        from_=alt.LookupData(
+            data=county_pop, key="id", fields=["county", "state", "population"]
+        ),
     )
     .encode(
         color=alt.Color(

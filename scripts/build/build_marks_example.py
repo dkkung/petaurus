@@ -11,12 +11,12 @@ Usage (from project root):
 
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import altair as alt
 import numpy as np
 import polars as pl
 import vl_convert as vlc
-from typing import Any
 
 import dysonsphere as ds
 from dysonsphere.export import _fix_tick_alignment
@@ -28,9 +28,7 @@ CATEGORIES = ["A", "B", "C", "D"]
 rng = np.random.default_rng(42)
 df = pl.DataFrame(
     {
-        "group": (
-            ["A"] * 200 + ["B"] * 200 + ["C"] * 200 + ["D"] * 200
-        ),
+        "group": (["A"] * 200 + ["B"] * 200 + ["C"] * 200 + ["D"] * 200),
         "value": np.concatenate(
             [
                 rng.normal(10, 2, 200),
@@ -48,13 +46,17 @@ title_params: dict[str, Any] = dict(orient="top", anchor="start", offset=4)
 fontSize = alt.theme.options.get("fontSize", 7)
 palette = ds.palette("blues2", n=len(CATEGORIES))
 
-left = ds.mark_strip(df, "group", "value", CATEGORIES, palette=palette, yTitle=None).properties(
+left = ds.mark_strip(
+    df, "group", "value", CATEGORIES, palette=palette, yTitle=None
+).properties(
     title=alt.TitleParams(
         ["mark_strip(df, xCol, yCol, categories)"], fontSize=fontSize, **title_params
     )
 )
 
-right = ds.mark_violin(df, "group", "value", CATEGORIES, palette=palette, yTitle=None).properties(
+right = ds.mark_violin(
+    df, "group", "value", CATEGORIES, palette=palette, yTitle=None
+).properties(
     title=alt.TitleParams(
         ["mark_violin(df, xCol, yCol, categories)"], fontSize=fontSize, **title_params
     )

@@ -14,10 +14,12 @@ def default_theme():
 @pytest.fixture
 def group_df():
     rng = np.random.default_rng(0)
-    return pl.DataFrame({
-        "group": ["A"] * 20 + ["B"] * 20,
-        "value": np.concatenate([rng.normal(0, 1, 20), rng.normal(2, 1, 20)]),
-    })
+    return pl.DataFrame(
+        {
+            "group": ["A"] * 20 + ["B"] * 20,
+            "value": np.concatenate([rng.normal(0, 1, 20), rng.normal(2, 1, 20)]),
+        }
+    )
 
 
 class TestBeeswarmOffsets:
@@ -44,7 +46,7 @@ class TestBeeswarmOffsets:
             for j in range(i + 1, len(y)):
                 dist_sq = (x[i] - x[j]) ** 2 + (y_px[i] - y_px[j]) ** 2
                 assert dist_sq >= (2 * spread) ** 2 - 1e-6, (
-                    f"Points {i} and {j} overlap: dist²={dist_sq:.4f}, min²={(2*spread)**2:.4f}"
+                    f"Points {i} and {j} overlap: dist²={dist_sq:.4f}, min²={(2 * spread) ** 2:.4f}"
                 )
 
     def test_identical_y_values_spread_out(self):
@@ -83,5 +85,7 @@ class TestAddBeeswarm:
         assert len(result) == len(group_df)
 
     def test_custom_column_name(self, group_df):
-        result = add_beeswarm(group_df, yCol="value", groupBy=["group"], outCol="my_swarm")
+        result = add_beeswarm(
+            group_df, yCol="value", groupBy=["group"], outCol="my_swarm"
+        )
         assert "my_swarm" in result.columns

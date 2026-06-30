@@ -50,18 +50,28 @@ def _pvalue_layer(
     # --- p-value ---
     if pvalue is None:
         if df is None or x_col is None or y_col is None:
-            raise ValueError("df, x_col, and y_col are required when pvalue is not provided.")
+            raise ValueError(
+                "df, x_col, and y_col are required when pvalue is not provided."
+            )
 
         if test == "tukey_hsd":
-            _cats = categories if categories is not None else sorted(df[x_col].unique().to_list())
-            all_groups = [df.filter(pl.col(x_col) == cat)[y_col].to_numpy() for cat in _cats]
+            _cats = (
+                categories
+                if categories is not None
+                else sorted(df[x_col].unique().to_list())
+            )
+            all_groups = [
+                df.filter(pl.col(x_col) == cat)[y_col].to_numpy() for cat in _cats
+            ]
             result = _stats.tukey_hsd(*all_groups)
             pvalue = float(result.pvalue[_cats.index(group1)][_cats.index(group2)])
         else:
             a = df.filter(pl.col(x_col) == group1)[y_col].to_numpy()
             b = df.filter(pl.col(x_col) == group2)[y_col].to_numpy()
             _tests = {
-                "mannwhitneyu": lambda: _stats.mannwhitneyu(a, b, alternative="two-sided").pvalue,
+                "mannwhitneyu": lambda: (
+                    _stats.mannwhitneyu(a, b, alternative="two-sided").pvalue
+                ),
                 "ttest_ind": lambda: _stats.ttest_ind(a, b).pvalue,
                 "ttest_rel": lambda: _stats.ttest_rel(a, b).pvalue,
                 "wilcoxon": lambda: _stats.wilcoxon(a, b).pvalue,
@@ -85,8 +95,19 @@ def _pvalue_layer(
     # --- y position ---
     if y is None:
         if df is None or x_col is None or y_col is None:
-            raise ValueError("y is required when df, x_col, and y_col are not provided.")
-        y = cast(float, df.filter(pl.col(x_col).is_in([group1, group2]))[y_col].cast(pl.Float64).max() or 0.0) + y_pad
+            raise ValueError(
+                "y is required when df, x_col, and y_col are not provided."
+            )
+        y = (
+            cast(
+                float,
+                df.filter(pl.col(x_col).is_in([group1, group2]))[y_col]
+                .cast(pl.Float64)
+                .max()
+                or 0.0,
+            )
+            + y_pad
+        )
 
     # --- resolve theme-linked defaults ---
     if chartWidth is None:
@@ -99,14 +120,20 @@ def _pvalue_layer(
     # --- categories and text x position ---
     if categories is None:
         if df is None or x_col is None:
-            raise ValueError("categories is required when df and x_col are not provided.")
+            raise ValueError(
+                "categories is required when df and x_col are not provided."
+            )
         categories = sorted(df[x_col].unique().to_list())
 
     g1_idx = categories.index(group1)
     g2_idx = categories.index(group2)
 
     stroke_cap = alt.theme.options.get("strokeCap", "round")
-    _rule_kwargs = {"strokeWidth": strokeWidth, "strokeDash": [0, 0], "strokeCap": stroke_cap}
+    _rule_kwargs = {
+        "strokeWidth": strokeWidth,
+        "strokeDash": [0, 0],
+        "strokeCap": stroke_cap,
+    }
 
     # dy offsets in SVG pixels. Asterisk glyphs sit close to the baseline so a small
     # offset seats them flush; alphanumeric labels (including "ns") need more clearance.
@@ -321,20 +348,27 @@ def add_pvalue(
             )
         computed_pvalues = list(pvalues)
     elif test == "tukey_hsd":
-        all_groups = [df.filter(pl.col(xCol) == cat)[yCol].to_numpy() for cat in categories]
+        all_groups = [
+            df.filter(pl.col(xCol) == cat)[yCol].to_numpy() for cat in categories
+        ]
         result = _stats.tukey_hsd(*all_groups)
         computed_pvalues = [
-            float(result.pvalue[categories.index(g1)][categories.index(g2)]) for g1, g2 in pairs
+            float(result.pvalue[categories.index(g1)][categories.index(g2)])
+            for g1, g2 in pairs
         ]
     else:
         _tests = {
-            "mannwhitneyu": lambda a, b: _stats.mannwhitneyu(a, b, alternative="two-sided").pvalue,
+            "mannwhitneyu": lambda a, b: (
+                _stats.mannwhitneyu(a, b, alternative="two-sided").pvalue
+            ),
             "ttest_ind": lambda a, b: _stats.ttest_ind(a, b).pvalue,
             "ttest_rel": lambda a, b: _stats.ttest_rel(a, b).pvalue,
             "wilcoxon": lambda a, b: _stats.wilcoxon(a, b).pvalue,
         }
         if test not in _tests:
-            raise ValueError(f"Unknown test {test!r}. Choose from: {['tukey_hsd'] + list(_tests)}")
+            raise ValueError(
+                f"Unknown test {test!r}. Choose from: {['tukey_hsd'] + list(_tests)}"
+            )
         computed_pvalues = []
         for g1, g2 in pairs:
             a = df.filter(pl.col(xCol) == g1)[yCol].to_numpy()
@@ -350,7 +384,9 @@ def add_pvalue(
     if yPad is None:
         annotated_groups_for_pad = list({g for pair in pairs for g in pair})
         y_vals = df.filter(pl.col(xCol).is_in(annotated_groups_for_pad))[yCol]
-        y_range = cast(float, y_vals.cast(pl.Float64).max() or 0.0) - cast(float, y_vals.cast(pl.Float64).min() or 0.0)
+        y_range = cast(float, y_vals.cast(pl.Float64).max() or 0.0) - cast(
+            float, y_vals.cast(pl.Float64).min() or 0.0
+        )
         chart_height = alt.theme.options.get("chartHeight", 100)
         yPad = (10.0 if bracketStyle == "bracket" else 8.0) * y_range / chart_height
 
@@ -361,7 +397,16 @@ def add_pvalue(
     else:
         if yStart is None:
             annotated_groups = list({g for pair in pairs for g in pair})
-            yStart = cast(float, df.filter(pl.col(xCol).is_in(annotated_groups))[yCol].cast(pl.Float64).max() or 0.0) + yPad
+            yStart = (
+                cast(
+                    float,
+                    df.filter(pl.col(xCol).is_in(annotated_groups))[yCol]
+                    .cast(pl.Float64)
+                    .max()
+                    or 0.0,
+                )
+                + yPad
+            )
 
         if yStep is None:
             yStep = yPad * 2
@@ -371,7 +416,9 @@ def add_pvalue(
 
         # Assign stacking levels via greedy interval scheduling.
         # Shorter spans go to lower levels so narrow brackets sit closer to the data.
-        pair_indices = [(categories.index(g1), categories.index(g2)) for g1, g2 in pairs]
+        pair_indices = [
+            (categories.index(g1), categories.index(g2)) for g1, g2 in pairs
+        ]
         sort_order = sorted(
             range(len(pairs)),
             key=lambda i: abs(pair_indices[i][1] - pair_indices[i][0]),
@@ -384,7 +431,9 @@ def add_pvalue(
             lo, hi = min(pair_indices[i]), max(pair_indices[i])
             placed = False
             for level_idx, occupied in enumerate(levels):
-                overlaps = any(not (hi < occ_lo or lo > occ_hi) for occ_lo, occ_hi in occupied)
+                overlaps = any(
+                    not (hi < occ_lo or lo > occ_hi) for occ_lo, occ_hi in occupied
+                )
                 if not overlaps:
                     occupied.append((lo, hi))
                     pair_levels[i] = level_idx
