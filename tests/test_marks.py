@@ -79,11 +79,57 @@ class TestMarkViolin:
         for layer in spec["layer"]:
             assert "xOffset" not in layer.get("encoding", {})
 
+    def test_x_title_defaults_to_col_name(self, group_df):
+        result = mark_violin(group_df, xCol="group", yCol="value", categories=CATEGORIES)
+        spec = result.to_dict()
+        x_titles = [
+            layer.get("encoding", {}).get("x", {}).get("title")
+            for layer in spec["layer"]
+            if layer.get("encoding", {}).get("x", {}).get("title") is not None
+        ]
+        assert any(t == "group" for t in x_titles)
+
+    def test_x_title_none_suppresses(self, group_df):
+        result = mark_violin(group_df, xCol="group", yCol="value", categories=CATEGORIES, xTitle=None)
+        spec = result.to_dict()
+        for layer in spec["layer"]:
+            x_enc = layer.get("encoding", {}).get("x", {})
+            assert x_enc.get("title") is None or "title" not in x_enc
+
 
 class TestMarkStrip:
     def test_returns_layer_chart(self, group_df):
         result = mark_strip(group_df, xCol="group", yCol="value", categories=CATEGORIES)
         assert isinstance(result, alt.LayerChart)
+
+    def test_x_title_defaults_to_col_name(self, group_df):
+        result = mark_strip(group_df, xCol="group", yCol="value", categories=CATEGORIES)
+        spec = result.to_dict()
+        x_titles = [
+            layer.get("encoding", {}).get("x", {}).get("title")
+            for layer in spec["layer"]
+            if layer.get("encoding", {}).get("x", {}).get("title") is not None
+        ]
+        assert any(t == "group" for t in x_titles)
+
+    def test_x_title_none_suppresses(self, group_df):
+        result = mark_strip(group_df, xCol="group", yCol="value", categories=CATEGORIES, xTitle=None)
+        spec = result.to_dict()
+        for layer in spec["layer"]:
+            x_enc = layer.get("encoding", {}).get("x", {})
+            assert x_enc.get("title") is None or "title" not in x_enc
+
+    def test_mark_size_param(self, group_df):
+        result = mark_strip(group_df, xCol="group", yCol="value", categories=CATEGORIES, markSize=20)
+        spec = result.to_dict()
+        circle_layer = next(l for l in spec["layer"] if l.get("mark", {}).get("type") == "circle")
+        assert circle_layer["mark"]["size"] == 20
+
+    def test_mark_opacity_param(self, group_df):
+        result = mark_strip(group_df, xCol="group", yCol="value", categories=CATEGORIES, markOpacity=0.5)
+        spec = result.to_dict()
+        circle_layer = next(l for l in spec["layer"] if l.get("mark", {}).get("type") == "circle")
+        assert circle_layer["mark"]["opacity"] == 0.5
 
     def test_errorbars_disabled(self, group_df):
         result = mark_strip(
