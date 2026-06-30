@@ -644,7 +644,7 @@ def _multilabel_layer(
 
 
 def add_multilabel(
-    chart: alt.Chart,
+    chart: alt.Chart | alt.LayerChart,
     groups: dict[str, list] | None = None,
     categories: list[str] | None = None,
     *,
@@ -659,6 +659,7 @@ def add_multilabel(
     """
     Compose a chart with a grid annotation table, replacing its x-axis labels.
 
+    Accepts ``alt.Chart`` or ``alt.LayerChart`` (e.g. a strip+boxplot layer).
     Strips x-axis labels and ticks from ``chart``, builds a condition table via
     :func:`_multilabel_layer`, and returns
     ``alt.vconcat(chart, annotation, spacing=spacing).resolve_scale(x="shared")``.
