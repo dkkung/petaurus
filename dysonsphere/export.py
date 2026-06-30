@@ -129,7 +129,9 @@ def _fix_tick_alignment(path: str, band_padding: float = 0.1, chart_width: float
     For all other charts (strip, violin, etc.): band centers are computed analytically
     from the number of categories and theme scale parameters, then ticks are moved to
     those float positions.  A validation step ensures the fix is only applied to nominal
-    band scales — quantitative and time axes are left untouched.
+    band scales — quantitative and time axes are left untouched.  When two band-scale
+    formulas (Case pi and Case 0) floor to the same integers, box mark x-centers
+    (aria-roledescription="box") are used to resolve the ambiguity.
     """
     import re
     import xml.etree.ElementTree as ET
@@ -200,10 +202,10 @@ def _fix_tick_alignment(path: str, band_padding: float = 0.1, chart_width: float
         # Keep unique positions; the center_map lookup handles all occurrences uniformly.
         tick_xs = list(set(tick_xs))
 
-        # Three scale formulas tried in order (pi before 0 to resolve ambiguity when
-        # both floor to the same integers for large n). Validation matches actual SVG
-        # integer positions to the expected floor/round of each formula - only the
-        # matching formula is applied, ensuring we don't touch quantitative or time axes.
+        # Three scale formulas. Validation matches actual SVG integer tick positions to
+        # the expected floor/round of each formula - only the matching formula is applied,
+        # ensuring we don't touch quantitative or time axes. When pi and 0 floor to the
+        # same integers (e.g. n=6, W=100, bp=0.1), box mark x-centers break the tie.
         #
         #   pi. Band, paddingInner=paddingOuter=band_padding (bar/violin without xOffset)
         #      step = W / (n + bp);  center_i = step·(i + 0.5 + bp/2)
@@ -229,7 +231,36 @@ def _fix_tick_alignment(path: str, band_padding: float = 0.1, chart_width: float
         expected_pt = [round(step_pt * (0.5 + i)) for i in range(n)]
 
         actual_int = [int(t) for t in sorted_ticks]
-        if actual_int == expected_pi:
+        if actual_int == expected_pi and actual_int == expected0:
+            # Ambiguous: both formulas floor to the same integer tick positions
+            # (e.g. n=6, W=100, bp=0.1). Use box mark x-centers to resolve.
+            box_ctr: list[float] = []
+            for el in root.iter(f"{{{NS}}}path"):
+                if el.get("aria-roledescription") == "box":
+                    mb = re.match(r"M([\d.]+),[-\d.e+]+L([\d.]+),", el.get("d", ""))
+                    if mb:
+                        box_ctr.append((float(mb.group(1)) + float(mb.group(2))) / 2)
+            if not box_ctr:
+                return
+            sorted_box = sorted(box_ctr)
+            pi_err = sum(
+                abs(b - step_pi * (i + 0.5 + band_padding / 2))
+                for i, b in enumerate(sorted_box)
+            )
+            z0_err = sum(
+                abs(b - step0 * (band_padding + i + 0.5)) for i, b in enumerate(sorted_box)
+            )
+            if pi_err < z0_err:
+                center_map = {
+                    t: round(step_pi * (i + 0.5 + band_padding / 2), 4)
+                    for i, t in enumerate(sorted_ticks)
+                }
+            else:
+                center_map = {
+                    t: round(step0 * (band_padding + i + 0.5), 4)
+                    for i, t in enumerate(sorted_ticks)
+                }
+        elif actual_int == expected_pi:
             center_map = {
                 t: round(step_pi * (i + 0.5 + band_padding / 2), 4)
                 for i, t in enumerate(sorted_ticks)

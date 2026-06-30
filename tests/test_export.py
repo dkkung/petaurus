@@ -217,9 +217,9 @@ class TestFixTickAlignment:
         _fix_tick_alignment(path, band_padding=0.1, chart_width=200)
         assert Path(path).read_text() == content
 
-    def test_case_pi_preferred_when_ambiguous(self, tmp_path):
+    def test_ambiguous_no_box_marks_returns_unfixed(self, tmp_path):
         # With W=100, n=6, band_padding=0.1, Case 0 and Case pi floor to the same
-        # integers.  Fix should prefer Case pi (violin/boxplot formula).
+        # integers. Without box marks to disambiguate, ticks are left unchanged.
         bp = 0.1
         W = 100
         n = 6
@@ -234,6 +234,65 @@ class TestFixTickAlignment:
             for x in ints0
         )
         svg = f'<svg xmlns="{NS}"><g class="mark-rule role-axis-tick">{lines}</g></svg>'
+        path = _write(tmp_path, "t.svg", svg)
+        _fix_tick_alignment(path, band_padding=bp, chart_width=W)
+        xs = _tick_xs(path)
+        # No box marks → can't resolve; ticks stay at integer positions
+        assert xs == pytest.approx([float(x) for x in ints0], abs=0.001)
+
+    def test_ambiguous_box_marks_at_case0_picks_case0(self, tmp_path):
+        # When ambiguous, box marks at Case 0 positions should cause Case 0 to be applied.
+        bp = 0.1
+        W = 100
+        n = 6
+        step0 = W / (n + 2 * bp)
+        step_pi = W / (n + bp)
+        ints = [int(step0 * (bp + i + 0.5)) for i in range(n)]  # same for both formulas
+
+        lines = "".join(
+            f'<line transform="translate({x},0)" x1="0" y1="0" x2="0" y2="-3"/>'
+            for x in ints
+        )
+        # Box marks at Case 0 centers: M(center-3),y L(center+3),y ...
+        box_marks = "".join(
+            f'<path aria-roledescription="box" d="M{step0*(bp+i+0.5)-3},10L{step0*(bp+i+0.5)+3},10"/>'
+            for i in range(n)
+        )
+        svg = (
+            f'<svg xmlns="{NS}">'
+            f'<g class="mark-rule role-axis-tick">{lines}</g>'
+            f"{box_marks}"
+            f"</svg>"
+        )
+        path = _write(tmp_path, "t.svg", svg)
+        _fix_tick_alignment(path, band_padding=bp, chart_width=W)
+        xs = _tick_xs(path)
+        expected = [round(step0 * (bp + i + 0.5), 4) for i in range(n)]
+        assert xs == pytest.approx(expected, abs=0.001)
+
+    def test_ambiguous_box_marks_at_case_pi_picks_case_pi(self, tmp_path):
+        # When ambiguous, box marks at Case pi positions should cause Case pi to be applied.
+        bp = 0.1
+        W = 100
+        n = 6
+        step0 = W / (n + 2 * bp)
+        step_pi = W / (n + bp)
+        ints = [int(step_pi * (i + 0.5 + bp / 2)) for i in range(n)]
+
+        lines = "".join(
+            f'<line transform="translate({x},0)" x1="0" y1="0" x2="0" y2="-3"/>'
+            for x in ints
+        )
+        box_marks = "".join(
+            f'<path aria-roledescription="box" d="M{step_pi*(i+0.5+bp/2)-3},10L{step_pi*(i+0.5+bp/2)+3},10"/>'
+            for i in range(n)
+        )
+        svg = (
+            f'<svg xmlns="{NS}">'
+            f'<g class="mark-rule role-axis-tick">{lines}</g>'
+            f"{box_marks}"
+            f"</svg>"
+        )
         path = _write(tmp_path, "t.svg", svg)
         _fix_tick_alignment(path, band_padding=bp, chart_width=W)
         xs = _tick_xs(path)
