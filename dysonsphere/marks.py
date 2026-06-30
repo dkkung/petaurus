@@ -7,6 +7,7 @@ import polars as pl
 from .transforms import add_beeswarm, add_jitter
 from .utils import ensure_polars
 
+
 class _UnsetType:
     pass
 
@@ -75,6 +76,11 @@ def mark_violin(
     xTitle:
         X-axis title. ``None`` (default) suppresses the title.
 
+    The returned ``LayerChart`` is safe to place in ``alt.hconcat()`` alongside
+    ``mark_strip()`` or any other chart — the violin uses absolute ``x:Q``
+    coordinates internally rather than ``xOffset``, so Vega-Lite's xOffset
+    scale resolution never squishes the violin shape.
+
     Examples
     --------
     ::
@@ -82,6 +88,11 @@ def mark_violin(
         ds.theme(chartWidth=250)
         chart = ds.mark_violin(df, "group", "value", CATEGORIES)
         ds.save(chart, "violin")
+
+        # safe in hconcat with mark_strip
+        left = ds.mark_strip(df, "group", "value", CATEGORIES)
+        right = ds.mark_violin(df, "group", "value", CATEGORIES)
+        ds.save(alt.hconcat(left, right), "comparison")
 
         # with optional outline and custom colors
         chart = ds.mark_violin(
@@ -102,13 +113,24 @@ def mark_violin(
     mark_size = alt.theme.options.get("markSize", 10)
     band_padding = alt.theme.options.get("bandPadding", 0.1)
     chart_width = alt.theme.options.get("chartWidth", 100)
-    step = chart_width / (len(categories) + 2 * band_padding)
-    band_center = step * (0.5 - band_padding)
+    # mark_boxplot uses paddingInner=paddingOuter=band_padding, so the D3 band
+    # scale formula is step = W / (n - paddingInner + 2*paddingOuter) = W / (n + bp).
+    # Band center for index i = step * (0.5 + bp/2 + i).  This differs from the
+    # xOffset/mark_circle formula (W / (n + 2*bp); center = step*(bp + 0.5 + i)).
+    step = chart_width / (len(categories) + band_padding)
+    half_width = mark_size * 0.75
 
+    # Precompute absolute x positions for each violin point so the violin
+    # layer uses x:Q (not xOffset), avoiding Vega-Lite's shared xOffset
+    # scale resolution that squishes the violin when hconcated with any
+    # chart that also uses xOffset (e.g. mark_strip).
     violin_rows = []
-    for group in categories:
+    for i, group in enumerate(categories):
+        x_center = step * (0.5 + band_padding / 2 + i)
         vals = df.filter(pl.col(xCol) == group)[yCol].to_numpy()
-        y_grid = np.linspace(float(vals.min()) - 1, float(vals.max()) + 1, steps)
+        y_min = float(vals.min()) - 1
+        y_max = float(vals.max()) + 1
+        y_grid = np.linspace(y_min, y_max, steps)
         kde = gaussian_kde(vals)
         density = kde(y_grid)
         density_norm = density / density.max()
@@ -118,7 +140,7 @@ def mark_violin(
                 {
                     "__group": group,
                     "__y": float(y),
-                    "__violin_px": float(d),
+                    "__x": x_center + d * half_width,
                     "__order": order,
                 }
             )
@@ -127,7 +149,7 @@ def mark_violin(
                 {
                     "__group": group,
                     "__y": float(y),
-                    "__violin_px": float(-d),
+                    "__x": x_center - d * half_width,
                     "__order": steps + order,
                 }
             )
@@ -156,14 +178,7 @@ def mark_violin(
         alt.Chart(violin_df)
         .mark_line(**mark_kwargs)
         .encode(
-            x=alt.X("__group:N", sort=categories, title=xTitle, axis=x_axis),
-            xOffset=alt.XOffset(
-                "__violin_px:Q",
-                scale=alt.Scale(
-                    domain=[-1, 1],
-                    range=[band_center - mark_size * 0.75, band_center + mark_size * 0.75],
-                ),
-            ),
+            x=alt.X("__x:Q", scale=alt.Scale(domain=[0, chart_width]), axis=None),
             y=alt.Y("__y:Q", title=_y_title),
             order=alt.Order("__order:Q"),
             color=alt.Color(
@@ -189,12 +204,12 @@ def mark_violin(
             **({"size": boxplotSize} if boxplotSize is not None else {}),
         )
         .encode(
-            x=alt.X(f"{xCol}:N", sort=categories),
+            x=alt.X(f"{xCol}:N", sort=categories, title=xTitle, axis=x_axis),
             y=alt.Y(f"{yCol}:Q", title=_y_title),
         )
     )
 
-    return cast(alt.LayerChart, alt.layer(violin, boxplot))
+    return cast(alt.LayerChart, alt.layer(violin, boxplot).resolve_axis(x="independent"))
 
 
 def mark_strip(

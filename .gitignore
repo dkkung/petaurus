@@ -61,3 +61,5 @@ pipenv
 !docs/nonlinear_example_light.png
 !docs/reference_line_example_light.png
 !docs/text_example_light.png
+!docs/transforms_example_light.png
+!docs/marks_example_light.png

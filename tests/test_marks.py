@@ -56,6 +56,29 @@ class TestMarkViolin:
             y_enc = layer.get("encoding", {}).get("y", {})
             assert y_enc.get("title") is None or "title" not in y_enc
 
+    def test_violin_x_uses_absolute_quantitative(self, group_df):
+        # Violin line mark encodes x:Q with axis=None - absolute pixel coordinates,
+        # not xOffset - so hconcat with mark_strip never squishes the violin.
+        result = mark_violin(group_df, xCol="group", yCol="value", categories=CATEGORIES)
+        spec = result.to_dict()
+        violin_layer = next(
+            l for l in spec["layer"]
+            if isinstance(l.get("mark"), dict) and l["mark"].get("type") == "line"
+        )
+        x_enc = violin_layer["encoding"]["x"]
+        assert x_enc["type"] == "quantitative"
+        # axis=None serialises as null in to_dict()
+        assert x_enc.get("axis") is None
+        chart_width = alt.theme.options.get("chartWidth", 200)
+        assert x_enc["scale"]["domain"] == [0, chart_width]
+
+    def test_violin_no_xoffset_in_any_layer(self, group_df):
+        # No layer uses xOffset - Vega-Lite won't merge xOffset scales across hconcat panels.
+        result = mark_violin(group_df, xCol="group", yCol="value", categories=CATEGORIES)
+        spec = result.to_dict()
+        for layer in spec["layer"]:
+            assert "xOffset" not in layer.get("encoding", {})
+
 
 class TestMarkStrip:
     def test_returns_layer_chart(self, group_df):

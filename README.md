@@ -317,6 +317,8 @@ ds.save(chart, "myplot", background=["dark"])     # dark variant only
 
 ### Data transforms
 
+![transforms example](https://raw.githubusercontent.com/dkkung/dysonsphere/main/docs/transforms_example_light.png)
+
 #### Beeswarm (`add_beeswarm`)
 
 Computes collision-avoiding x-offsets per group using an analytic method. Points are sorted by y position and placed greedily from the centre outward: for each point, the forbidden x intervals imposed by already-placed neighbours are computed exactly as `px ± √((2·spread)² − dy²)`, and the candidate closest to 0 outside all intervals is chosen. Better than jitter for small n; total width grows with n.
@@ -361,6 +363,8 @@ alt.Chart(df).mark_circle().encode(
 
 ### Custom marks
 
+![marks example](https://raw.githubusercontent.com/dkkung/dysonsphere/main/docs/marks_example_light.png)
+
 #### Strip (`mark_strip`)
 
 Jittered or beeswarm points with a median tick and optional mean ± error bars.
@@ -386,7 +390,7 @@ chart = ds.mark_strip(df, "group", "value", CATEGORIES, scatter="beeswarm")
 
 #### Violin (`mark_violin`)
 
-Violin plot with an embedded boxplot.
+Violin plot with an embedded boxplot. The returned chart is safe to place in `alt.hconcat()` alongside `mark_strip()` or any other chart — no extra `.resolve_scale()` calls needed.
 
 ```python
 ds.theme(chartWidth=300)
@@ -394,6 +398,11 @@ palette = ds.palette("lavenders", n=len(CATEGORIES))
 
 chart = ds.mark_violin(df, "group", "value", CATEGORIES, palette=palette)
 ds.save(chart, "violin")
+
+# side-by-side with mark_strip — works without special resolution
+left = ds.mark_strip(df, "group", "value", CATEGORIES)
+right = ds.mark_violin(df, "group", "value", CATEGORIES)
+ds.save(alt.hconcat(left, right), "comparison")
 ```
 
 | Parameter | Default | Description |

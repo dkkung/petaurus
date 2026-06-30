@@ -200,16 +200,17 @@ def _fix_tick_alignment(path: str, band_padding: float = 0.1, chart_width: float
         # Keep unique positions; the center_map lookup handles all occurrences uniformly.
         tick_xs = list(set(tick_xs))
 
-        # Three scale formulas tried in order. Validation matches actual SVG integer positions
-        # to the expected floor/round of each formula — only the matching formula is applied,
-        # ensuring we don't touch quantitative or time axes.
-        #
-        #   0. Band, paddingInner=0 (xOffset charts), paddingOuter=band_padding
-        #      step = W / (n + 2·bp);  center_i = step·(bp + i + 0.5)
-        #      Vega uses Math.floor
+        # Three scale formulas tried in order (pi before 0 to resolve ambiguity when
+        # both floor to the same integers for large n). Validation matches actual SVG
+        # integer positions to the expected floor/round of each formula - only the
+        # matching formula is applied, ensuring we don't touch quantitative or time axes.
         #
         #   pi. Band, paddingInner=paddingOuter=band_padding (bar/violin without xOffset)
         #      step = W / (n + bp);  center_i = step·(i + 0.5 + bp/2)
+        #      Vega uses Math.floor
+        #
+        #   0. Band, paddingInner=0 (xOffset charts), paddingOuter=band_padding
+        #      step = W / (n + 2·bp);  center_i = step·(bp + i + 0.5)
         #      Vega uses Math.floor
         #
         #   pt. Point scale, pointPadding=0.5 (Vega-Lite default for scatter/strip marks)
@@ -228,14 +229,14 @@ def _fix_tick_alignment(path: str, band_padding: float = 0.1, chart_width: float
         expected_pt = [round(step_pt * (0.5 + i)) for i in range(n)]
 
         actual_int = [int(t) for t in sorted_ticks]
-        if actual_int == expected0:
-            center_map = {
-                t: round(step0 * (band_padding + i + 0.5), 4) for i, t in enumerate(sorted_ticks)
-            }
-        elif actual_int == expected_pi:
+        if actual_int == expected_pi:
             center_map = {
                 t: round(step_pi * (i + 0.5 + band_padding / 2), 4)
                 for i, t in enumerate(sorted_ticks)
+            }
+        elif actual_int == expected0:
+            center_map = {
+                t: round(step0 * (band_padding + i + 0.5), 4) for i, t in enumerate(sorted_ticks)
             }
         elif actual_int == expected_pt:
             center_map = {t: round(step_pt * (0.5 + i), 4) for i, t in enumerate(sorted_ticks)}

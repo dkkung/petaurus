@@ -217,6 +217,29 @@ class TestFixTickAlignment:
         _fix_tick_alignment(path, band_padding=0.1, chart_width=200)
         assert Path(path).read_text() == content
 
+    def test_case_pi_preferred_when_ambiguous(self, tmp_path):
+        # With W=100, n=6, band_padding=0.1, Case 0 and Case pi floor to the same
+        # integers.  Fix should prefer Case pi (violin/boxplot formula).
+        bp = 0.1
+        W = 100
+        n = 6
+        step0 = W / (n + 2 * bp)
+        step_pi = W / (n + bp)
+        ints0 = [int(step0 * (bp + i + 0.5)) for i in range(n)]
+        ints_pi = [int(step_pi * (i + 0.5 + bp / 2)) for i in range(n)]
+        assert ints0 == ints_pi, "precondition: both cases must floor to same ints for this test"
+
+        lines = "".join(
+            f'<line transform="translate({x},0)" x1="0" y1="0" x2="0" y2="-3"/>'
+            for x in ints0
+        )
+        svg = f'<svg xmlns="{NS}"><g class="mark-rule role-axis-tick">{lines}</g></svg>'
+        path = _write(tmp_path, "t.svg", svg)
+        _fix_tick_alignment(path, band_padding=bp, chart_width=W)
+        xs = _tick_xs(path)
+        expected = [round(step_pi * (i + 0.5 + bp / 2), 4) for i in range(n)]
+        assert xs == pytest.approx(expected, abs=0.001)
+
 
 # ── _fix_log_minor_ticks() ───────────────────────────────────────────────────
 
