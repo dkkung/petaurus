@@ -314,14 +314,18 @@ class TestReportRegistry:
 
     def test_build_report_contents(self):
         r = st._run_omnibus("anova", _GROUPS, MULTI)
+        title = "Statistics | Omnibus | ANOVA"
         text = st._build_report(
-            title=r.name,
+            title=title,
             descriptives=st._describe_all(_GROUPS, MULTI),
             omnibus=r,
             comparisons=[{"g1": "A", "g2": "C", "pvalue": 0.001, "effectName": "d", "effect": -2.5}],
             comparisonName="tukey_hsd",
         )
-        assert "ANOVA" in text and "Group descriptives:" in text
+        lines = text.splitlines()
+        assert lines[0] == title
+        assert lines[1] == "─" * len(title)  # box-drawing underline matches title width
+        assert "Group descriptives:" in text
         assert "Post-hoc (tukey_hsd):" in text and "A vs C" in text
 
 

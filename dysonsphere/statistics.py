@@ -349,12 +349,12 @@ def _build_report(
     ``comparisons`` is a list of dicts with keys ``g1``, ``g2``, ``pvalue`` and
     optionally ``effectName``/``effect``.
     """
-    lines: list[str] = [f"=== {title} ==="]
+    lines: list[str] = [title, "─" * len(title), ""]
 
     if omnibus is not None:
         df_str = ", ".join(str(d) for d in omnibus.df)
         stat = f"{omnibus.statSymbol}({df_str}) = {_fmt(omnibus.stat, 3)}"
-        lines.append(f"{omnibus.name}: {stat}, P {_fmt_p(omnibus.pvalue)}")
+        lines.append(f"{stat}, P {_fmt_p(omnibus.pvalue)}")
         lines.append(f"Effect size: {omnibus.effectName} = {_fmt(omnibus.effectSize, 3)}")
         lines.append("")
 

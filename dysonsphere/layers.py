@@ -1415,8 +1415,14 @@ def add_pvalue(
             )
 
     # --- report: always queued for export metadata; printed when report=True ---
+    if omnibus_result is not None:
+        report_title = f"Statistics | Omnibus | {omnibus_result.name}"
+    elif pvalues is not None:
+        report_title = "Statistics | Pairwise comparisons | user p-values"
+    else:
+        report_title = f"Statistics | Pairwise comparisons | {test}"
     report_text = _build_report(
-        title=omnibus_result.name if omnibus_result is not None else "Pairwise comparisons",
+        title=report_title,
         descriptives=_describe_all(groups, categories),
         omnibus=omnibus_result,
         comparisons=comparisons or None,
