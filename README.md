@@ -7,7 +7,10 @@ An Altair configuration wrapper with perceptually uniform palettes and chart uti
 ## Installation
 
 ```sh
-# uv
+# uv: add as a dependency
+uv add dysonsphere
+
+# uv: pip install
 uv pip install dysonsphere
 
 # pip
@@ -54,7 +57,7 @@ ds.save(chart, "plots/myplot")
 ```python
 ds.theme()  # apply defaults
 
-ds.theme(  # custom configuration
+ds.theme(   # custom configuration
     chartWidth=400,
     chartHeight=250,
     fontSize=8,
@@ -120,7 +123,7 @@ ds.create_config(persist=True)     # writes to ~/.config/dysonsphere/ or %APPDAT
 dysonsphere looks for config files in this order (later files take precedence):
 
 1. `~/.config/dysonsphere/dysonsphere.toml` — user-wide; respects `$XDG_CONFIG_HOME`
-2. `dysonsphere.toml` — project-level; found by walking up from the current working directory to the filesystem root (like git locating `.git`)
+2. `./dysonsphere.toml` — project-level; found by walking up from the current working directory to the filesystem root (like git locating `.git`)
 
 Each file contains named style sections. Load a style with `ds.theme(style="name")`. Calling `ds.theme()` again with a different `style=` (or none) replaces the theme entirely — styles do not accumulate.
 
@@ -301,7 +304,17 @@ ds.save(chart, "plots/myplot")
 #         plots/myplot_vegalite.json
 ```
 
-Produces light and dark PNG and SVG files from a single call. SVG output is post-processed to flatten Vega's redundant `<g>` wrappers, making it easier to navigate in Illustrator. A Vega-Lite JSON spec is also saved by default for full reproducibility.
+**Always use `ds.save()` instead of `chart.save()`.** `ds.save()` is a wrapper around Altair's built-in save that runs several post-processing steps essential for correct rendering in dysonsphere-themed charts:
+
+- **Tick alignment** — Vega floors axis tick positions to integers for screen rendering; at 1200 PPI this becomes a visible gap between ticks and their marks. `ds.save()` corrects tick transforms to exact float positions.
+- **Minor tick correction** — corrects sub-pixel rounding on log-scale and power-scale minor ticks so spacing is visually uniform at high DPI.
+- **Axis layering** — moves axis elements to the front so they render above chart marks (relevant for `viewFill`-filled charts).
+- **SVG simplification** — flattens Vega's redundant `<g>` wrappers for cleaner Illustrator imports.
+- **Light/dark variants** — renders both background modes in a single call by toggling `darkmode` in the active theme.
+
+Calling `chart.save()` directly skips all of the above and will produce misaligned ticks and incorrect minor tick spacing in dysonsphere charts.
+
+`ds.save()` produces light and dark PNG and SVG files from a single call. A Vega-Lite JSON spec is also saved by default for full reproducibility.
 
 ```python
 ds.save(chart, "myplot", ppi=1200)                # default PPI; reduce for faster exports
@@ -317,9 +330,9 @@ ds.save(chart, "myplot", background=["dark"])     # dark variant only
 
 ### Data transforms
 
-#### Beeswarm (`add_beeswarm`)
+#### Beeswarm
 
-Computes collision-avoiding x-offsets per group using an analytic method. Points are sorted by y position and placed greedily from the centre outward: for each point, the forbidden x intervals imposed by already-placed neighbours are computed exactly as `px ± √((2·spread)² − dy²)`, and the candidate closest to 0 outside all intervals is chosen. Better than jitter for small n; total width grows with n.
+`add_beeswarm()` computes collision-avoiding x-offsets per group using an analytic method. Points are sorted by y position and placed greedily from the centre outward: for each point, the forbidden x intervals imposed by already-placed neighbours are computed exactly as `px ± √((2·spread)² − dy²)`, and the candidate closest to 0 outside all intervals is chosen. Better than jitter for small n; total width grows with n.
 
 ```python
 df = ds.add_beeswarm(df, yCol="value", groupBy=["group"], spread=2.0)
@@ -339,9 +352,9 @@ alt.Chart(df).mark_circle().encode(
 | `heightPx` | `theme(chartHeight)` | Chart height in pixels |
 | `outCol` | `"beeswarm_x"` | Output column name |
 
-#### Jitter (`add_jitter`)
+#### Jitter
 
-Adds random Gaussian x-offsets to each row. Each offset is drawn independently from N(0, spread²) — ~68% of points fall within ±spread of centre, ~95% within ±2·spread. Points can overlap; use `add_beeswarm()` for small n where overlap is undesirable.
+`add_jitter()` adds random Gaussian x-offsets to each row. Each offset is drawn independently from N(0, spread²) — ~68% of points fall within ±spread of centre, ~95% within ±2·spread. Points can overlap; use `add_beeswarm()` for small n where overlap is undesirable.
 
 ```python
 df = ds.add_jitter(df, spread=5)
@@ -363,9 +376,9 @@ alt.Chart(df).mark_circle().encode(
 
 ### Custom marks
 
-#### Strip (`mark_strip`)
+#### Strip plots (`mark_strip`)
 
-Jittered or beeswarm points with a median tick and optional mean ± error bars.
+Create a `chart` with jittered or beeswarm points with a median tick and optional mean ± error bars using `mark_strip()`.
 
 ```python
 chart = ds.mark_strip(df, "group", "value", CATEGORIES)
@@ -386,9 +399,9 @@ chart = ds.mark_strip(df, "group", "value", CATEGORIES, scatter="beeswarm")
 | `yTitle` | `yCol` | Y-axis title; `None` suppresses it |
 | `xTitle` | `None` | X-axis title; `None` (default) suppresses it |
 
-#### Violin (`mark_violin`)
+#### Violin
 
-Violin plot with an embedded boxplot. The returned chart is safe to place in `alt.hconcat()` alongside `mark_strip()` or any other chart — no extra `.resolve_scale()` calls needed.
+Create a violin plot with an embedded boxplot with `mark_violin()`. The returned chart is safe to place in `alt.hconcat()` alongside `mark_strip()` or any other chart — no extra `.resolve_scale()` calls needed.
 
 ```python
 ds.theme(chartWidth=300)
@@ -423,7 +436,9 @@ ds.save(alt.hconcat(left, right), "comparison")
 
 ![marks example](https://raw.githubusercontent.com/dkkung/dysonsphere/main/docs/marks_example_light.png)
 
-### Statistical annotations (`add_pvalue`)
+### Statistical annotations
+
+#### Adding p-value annotations
 
 `add_pvalue()` annotates one or more group comparisons with p-value brackets, stacking them automatically so they don't overlap. Combine with any chart using `+`.
 
@@ -495,7 +510,7 @@ ds.add_pvalue(
 | `fontSize` | `6` | Font size of p-value labels |
 | `decimals` | `3` | Decimal places in the p-value label (only for `labelStyle="p"`) |
 
-### Multilabels (`add_multilabel`)
+### Multilabels
 
 `add_multilabel()` attaches a condition table directly below a chart, replacing its x-axis labels. Both `groups` and `categories` are optional — you can call it with only sample sizes or category labels if that's all you need.
 
@@ -517,7 +532,7 @@ Three `style` options are available: `"plusminus"` renders `True` as `+` and `Fa
 
 #### Sample sizes
 
-Pass `showSampleSize=True` to automatically inject a per-category sample size row. Requires `df` and `xCol`; counts are computed via `ds.count_n()`.
+Pass `showSampleSize=True` to `add_multilabel()` to automatically inject a per-category sample size row. Requires `df` and `xCol`; counts are computed via `ds.count_n()`.
 
 ```python
 ds.add_multilabel(
@@ -545,7 +560,7 @@ ds.add_multilabel(chart, categories=CATEGORIES, showSampleSize=True, df=df, xCol
 
 #### Category labels
 
-Pass `categoryLabel=True` to render the x-axis category names as angled text in a dedicated row, replacing the stripped axis labels. This row lives outside the data band scale and is always placed at the top or bottom.
+Pass `categoryLabel=True` to `add_multilabel()` to render the x-axis category names as angled text in a dedicated row, replacing the stripped axis labels. This row lives outside the data band scale and is always placed at the top or bottom.
 
 ```python
 ds.add_multilabel(
@@ -602,7 +617,7 @@ ds.save(
 
 ### Chart annotations
 
-#### Background shading (`add_shade`)
+#### Background shading
 
 `add_shade()` builds a background `mark_rect` layer. Compose it behind the main chart with `+`.
 
@@ -656,7 +671,7 @@ shade = ds.add_shade(
 | `strokeDash` | `None` | `None` → solid; `True` → inherit `dashedWidth` from theme; list (e.g. `[4, 2]`) → explicit pattern |
 | `flush` | `None` | Extend outermost rects to the axis domain edge. `None` inherits from `theme(closed=...)` |
 
-#### Reference lines (`add_rule`)
+#### Reference lines
 
 `add_rule()` builds a horizontal or vertical `mark_rule` layer. Compose it with the main chart using `+`.
 
@@ -701,7 +716,7 @@ chart = base + ds.add_rule(10, axis="x", label="t₀", labelPosition="left")
 | `opacity` | `1.0` | Line opacity |
 | `fontSize` | `None` | Label font size; `None` inherits from theme |
 
-#### Text annotations (`add_text`)
+#### Text annotations
 
 `add_text()` places one or more text annotations at arbitrary positions within a chart. Compose it with the main chart using `+`.
 
@@ -914,7 +929,7 @@ chart = ds.add_pow_ticks(
 
 ```sh
 # uv
-uv run python scripts/build/print_palettes.py
+uv run scripts/build/print_palettes.py
 
 # pip
 python3 scripts/build/print_palettes.py
@@ -935,7 +950,7 @@ Run all build scripts in one command:
 
 ```sh
 # uv
-uv run python scripts/build_all.py
+uv run scripts/build_all.py
 
 # pip
 python3 scripts/build_all.py
