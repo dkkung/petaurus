@@ -309,7 +309,7 @@ ds.save(chart, "plots/myplot")
 
 Calling `chart.save()` directly skips all of the above and will produce misaligned ticks and incorrect minor tick spacing in dysonsphere charts.
 
-`ds.save()` produces light and dark PNG and SVG files from a single call. A Vega-Lite JSON spec is also saved by default for full reproducibility.
+`ds.save()` produces light and dark PNG and SVG files from a single call. A Vega-Lite JSON spec is also saved by default for full reproducibility. It accepts any Altair chart type — `Chart`, `LayerChart`, `FacetChart`, `HConcatChart`, `VConcatChart`, or `ConcatChart` — as well as a zero-argument callable that returns one.
 
 ```python
 ds.save(chart, "myplot", ppi=1200)                # default PPI; reduce for faster exports
