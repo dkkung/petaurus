@@ -1,4 +1,5 @@
 import re
+import struct
 
 import pytest
 
@@ -102,6 +103,12 @@ class TestExportSwatches:
         export_swatches(tmp_path)
         assert (tmp_path / "import_dysonsphere_palettes_to_illustrator.jsx").exists()
 
+    def test_creates_ase_file(self, tmp_path):
+        from dysonsphere.palettes import export_swatches
+
+        export_swatches(tmp_path)
+        assert (tmp_path / "dysonsphere.ase").exists()
+
     def test_jsx_contains_palette_names(self, tmp_path):
         from dysonsphere.palettes import export_swatches
 
@@ -109,9 +116,55 @@ class TestExportSwatches:
         content = (tmp_path / "import_dysonsphere_palettes_to_illustrator.jsx").read_text()
         assert '"blues"' in content
         assert '"reds"' in content
-        # group names must carry the "dysonsphere " prefix
-        assert 'colorGroup.name = "dysonsphere " + paletteName;' in content
-        assert 'swatch.name = "dysonsphere " + paletteName' in content
+        assert 'colorGroup.name = paletteName;' in content
+        assert 'swatch.name = paletteName + " - "' in content
+
+    def test_ase_signature_and_structure(self, tmp_path):
+        from dysonsphere.palettes import export_swatches
+
+        export_swatches(tmp_path)
+        data = (tmp_path / "dysonsphere.ase").read_bytes()
+        assert data[:4] == b"ASEF"
+        major, minor = struct.unpack(">HH", data[4:8])
+        assert major == 1 and minor == 0
+
+    def test_ase_contains_all_palettes(self, tmp_path):
+        from dysonsphere.palettes import colors, export_swatches, _write_ase
+
+        _write_ase(colors, tmp_path / "test.ase")
+        raw = (tmp_path / "test.ase").read_bytes()
+        for name in list(colors.keys())[:5]:
+            assert name.encode("utf-16-be") in raw
+
+    def test_ase_rgb_values_correct(self, tmp_path):
+        from dysonsphere.palettes import _write_ase
+
+        _write_ase({"test": ["#ff8040"]}, tmp_path / "t.ase")
+        raw = (tmp_path / "t.ase").read_bytes()
+        # find "RGB " marker and read the three floats after it
+        idx = raw.index(b"RGB ")
+        r, g, b = struct.unpack(">fff", raw[idx + 4 : idx + 16])
+        assert r == pytest.approx(1.0, abs=0.001)
+        assert g == pytest.approx(0x80 / 255, abs=0.001)
+        assert b == pytest.approx(0x40 / 255, abs=0.001)
+
+    def test_ase_block_count(self, tmp_path):
+        from dysonsphere.palettes import _write_ase
+
+        # 2 palettes × (group_start + group_end) + 3 color entries = 7 blocks
+        _write_ase({"a": ["#ff0000", "#00ff00"], "b": ["#0000ff"]}, tmp_path / "t.ase")
+        raw = (tmp_path / "t.ase").read_bytes()
+        (block_count,) = struct.unpack(">I", raw[8:12])
+        assert block_count == 7
+
+    def test_find_illustrator_swatches_returns_none_when_absent(self, tmp_path, monkeypatch):
+        from pathlib import Path
+
+        from dysonsphere.palettes import _find_illustrator_swatches
+
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        monkeypatch.delenv("APPDATA", raising=False)
+        assert _find_illustrator_swatches() is None
 
     def test_defaults_to_cwd(self, tmp_path, monkeypatch):
         from dysonsphere.palettes import export_swatches
@@ -119,3 +172,4 @@ class TestExportSwatches:
         monkeypatch.chdir(tmp_path)
         export_swatches()
         assert (tmp_path / "import_dysonsphere_palettes_to_illustrator.jsx").exists()
+        assert (tmp_path / "dysonsphere.ase").exists()

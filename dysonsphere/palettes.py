@@ -1,23 +1,12 @@
 import json
+import os
+import shutil
+import struct
 from pathlib import Path
 
 colors = {
-    # --- custom palettes ---
-    "adobe_greys": [
-        "#221F20",
-        "#414042",
-        "#58595B",
-        "#6D6E71",
-        "#818284",
-        "#949598",
-        "#A8A9AC",
-        "#BCBEC0",
-        "#D2D3D4",
-        "#E7E7E8",
-        "#F1F2F2",
-    ],
     # ── Palette build methodology ─────────────────────────────────────────────────
-    # All custom palettes below are built in Oklab (Ottosson 2020) for true
+    # All palettes below are built in Oklab (Ottosson 2020) for true
     # perceptual uniformity.  CIELAB variants (previously stored alongside as
     # *_cielab) were dropped because Oklab has strictly lower hue non-linearity,
     # especially in the blue region.
@@ -4747,27 +4736,88 @@ def palette(
     return result[::-1] if reverse else result
 
 
+def _ase_encode_name(name: str) -> bytes:
+    """Encode a swatch/group name as ASE UTF-16BE: uint16 char count (incl. null) + chars + null."""
+    encoded = (name + "\0").encode("utf-16-be")
+    return struct.pack(">H", len(name) + 1) + encoded
+
+
+def _ase_color_block(name: str, r: int, g: int, b: int) -> bytes:
+    data = _ase_encode_name(name) + b"RGB " + struct.pack(">fff", r / 255, g / 255, b / 255) + struct.pack(">H", 2)
+    return struct.pack(">HI", 0x0001, len(data)) + data
+
+
+def _ase_group_start(name: str) -> bytes:
+    data = _ase_encode_name(name)
+    return struct.pack(">HI", 0xC001, len(data)) + data
+
+
+def _ase_group_end() -> bytes:
+    return struct.pack(">HI", 0xC002, 0)
+
+
+def _write_ase(palette_colors: dict[str, list[str]], path: Path) -> None:
+    """Write palette_colors to an ASE (Adobe Swatch Exchange) binary file at path."""
+    blocks: list[bytes] = []
+    block_count = 0
+    for palette_name, hexes in palette_colors.items():
+        blocks.append(_ase_group_start(palette_name))
+        block_count += 1
+        for i, h in enumerate(hexes):
+            r, g, b = int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16)
+            blocks.append(_ase_color_block(f"{palette_name} - {i}", r, g, b))
+            block_count += 1
+        blocks.append(_ase_group_end())
+        block_count += 1
+    path.write_bytes(b"ASEF" + struct.pack(">HHI", 1, 0, block_count) + b"".join(blocks))
+
+
+def _find_illustrator_swatches() -> Path | None:
+    """Return the path to the Illustrator User Defined Swatches folder, or None if not found.
+
+    Searches the platform-specific Adobe data directories for any installed Illustrator
+    version and locale without hardcoding either. Prefers the highest (newest) version.
+    macOS: ~/Library/Application Support/Adobe/Adobe Illustrator {ver}/{locale}/Swatches/
+    Windows: %APPDATA%/Adobe/Adobe Illustrator {ver} Settings/{locale}/Swatches/
+    """
+    search_roots: list[Path] = [Path.home() / "Library" / "Application Support" / "Adobe"]
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        search_roots.append(Path(appdata) / "Adobe")
+    for root in search_roots:
+        if not root.exists():
+            continue
+        ai_dirs = sorted(root.glob("Adobe Illustrator *"), reverse=True)
+        for ai_dir in ai_dirs:
+            for swatches in sorted(ai_dir.glob("*/Swatches")):
+                return swatches
+    return None
+
+
 def export_swatches(directory: str | Path | None = None) -> None:
     """
-    Write an Adobe Illustrator ExtendScript (.jsx) to *directory* (default: current
-    working directory) that imports all dysonsphere palettes as named swatch groups.
+    Write a JSX script and an ASE swatch library for Adobe Illustrator to *directory*
+    (default: current working directory).
 
-    When run in Illustrator (File > Scripts > Other Script...), the script:
-    - Adds all palettes to the active document's Swatches panel as groups named
-      "dysonsphere [palette]" (e.g. "dysonsphere blues").
-    - Saves a "dysonsphere.ai" swatch library to the Illustrator User Defined swatches
-      folder so it appears under Open Swatch Library > User Defined after restarting
-      Illustrator. Falls back to a manual-save prompt if the path cannot be detected.
+    Produces two files:
+
+    - ``import_dysonsphere_palettes_to_illustrator.jsx`` — run via
+      File > Scripts > Other Script... to load all palettes into the active
+      document's Swatches panel as named groups.
+    - ``dysonsphere.ase`` — Adobe Swatch Exchange file containing all palettes as
+      named groups. Automatically copied to the Illustrator User Defined Swatches
+      folder if it can be detected; otherwise copy it there manually. After restarting
+      Illustrator it appears under Open Swatch Library > User Defined > dysonsphere.
     """
-    dest = (Path(directory) if directory is not None else Path.cwd()) / "import_dysonsphere_palettes_to_illustrator.jsx"
+    dest_dir = Path(directory) if directory is not None else Path.cwd()
 
+    # --- JSX: loads swatches into the active document ---
     js_palettes = json.dumps(colors, indent=4)
-
     jsx = f"""\
 // Adobe Illustrator script to import dysonsphere palettes as named swatch groups.
-// Also saves a 'dysonsphere' swatch library to your Illustrator User Defined folder.
 // Run via File > Scripts > Other Script...
-var doc = app.documents.length > 0 ? app.activeDocument : app.documents.add();
+// For a persistent library that survives across sessions and documents, use the
+// dysonsphere.ase file that was generated alongside this script.
 
 function hexToRGB(hex) {{
     hex = hex.replace('#', '');
@@ -4780,10 +4830,22 @@ function hexToRGB(hex) {{
 
 var palettes = {js_palettes};
 
+var paletteCount = 0;
+for (var _k in palettes) paletteCount++;
+
+// Add swatches to the active document (or a new one).
+// Remove any pre-existing dysonsphere groups so re-running the script is idempotent.
+var doc = app.documents.length > 0 ? app.activeDocument : app.documents.add();
+var existingGroups = doc.swatchGroups;
+for (var x = existingGroups.length - 1; x >= 0; x--) {{
+    if (existingGroups[x].name.indexOf("dysonsphere ") === 0 || palettes.hasOwnProperty(existingGroups[x].name)) {{
+        existingGroups[x].remove();
+    }}
+}}
 for (var paletteName in palettes) {{
     var hexColors = palettes[paletteName];
     var colorGroup = doc.swatchGroups.add();
-    colorGroup.name = "dysonsphere " + paletteName;
+    colorGroup.name = paletteName;
     for (var i = 0; i < hexColors.length; i++) {{
         var rgb = hexToRGB(hexColors[i]);
         var color = new RGBColor();
@@ -4791,67 +4853,31 @@ for (var paletteName in palettes) {{
         color.green = rgb[1];
         color.blue = rgb[2];
         var swatch = doc.swatches.add();
-        swatch.name = "dysonsphere " + paletteName + " - " + i;
+        swatch.name = paletteName + " - " + i;
         swatch.color = color;
         colorGroup.addSwatch(swatch);
     }}
 }}
 
-var libSaved = false;
-try {{
-    var aiMajor = parseInt(app.version.split('.')[0]);
-    var candidates = [
-        new Folder(Folder.userData + "/Library/Application Support/Adobe/"
-            + "Adobe Illustrator " + aiMajor + "/en_US/Swatches/"),
-        new Folder(Folder.userData + "/Library/Application Support/Adobe/"
-            + "Adobe Illustrator " + aiMajor + ".0/en_US/Swatches/"),
-        new Folder(Folder.userData + "/Adobe/Adobe Illustrator " + aiMajor + " Settings/en_US/Swatches/"),
-        new Folder(Folder.userData + "/Adobe/Adobe Illustrator " + aiMajor + ".0 Settings/en_US/Swatches/"),
-    ];
-    var swatchFolder = null;
-    for (var k = 0; k < candidates.length; k++) {{
-        if (candidates[k].exists) {{
-            swatchFolder = candidates[k];
-            break;
-        }}
-    }}
-    if (swatchFolder !== null) {{
-        var libDoc = app.documents.add(DocumentColorSpace.RGB);
-        for (var pn in palettes) {{
-            var hc = palettes[pn];
-            var cg = libDoc.swatchGroups.add();
-            cg.name = pn;
-            for (var j = 0; j < hc.length; j++) {{
-                var rgb2 = hexToRGB(hc[j]);
-                var col = new RGBColor();
-                col.red = rgb2[0];
-                col.green = rgb2[1];
-                col.blue = rgb2[2];
-                var sw = libDoc.swatches.add();
-                sw.name = pn + " - " + j;
-                sw.color = col;
-                cg.addSwatch(sw);
-            }}
-        }}
-        var libFile = new File(swatchFolder.fsName + "/dysonsphere.ai");
-        var saveOpts = new IllustratorSaveOptions();
-        saveOpts.pdfCompatible = false;
-        libDoc.saveAs(libFile, saveOpts);
-        libDoc.close(SaveOptions.DONOTSAVECHANGES);
-        libSaved = true;
-    }}
-}} catch (e) {{}}
-
-if (libSaved) {{
-    alert("Imported " + Object.keys(palettes).length + " palettes.\\n"
-        + "Saved 'dysonsphere' to User Defined swatch libraries. "
-        + "Restart Illustrator to see it under Open Swatch Library > User Defined.");
-}} else {{
-    alert("Imported " + Object.keys(palettes).length + " palettes.\\n"
-        + "To save as a permanent library: Swatches panel menu"
-        + " > Save Swatch Library as AI > name it 'dysonsphere'.");
-}}
+alert("Loaded " + paletteCount + " palettes into the active document.\\n"
+    + "For a persistent library: open the .ase file via\\n"
+    + "Open Swatch Library > Other Library...");
 """
+    jsx_path = dest_dir / "import_dysonsphere_palettes_to_illustrator.jsx"
+    jsx_path.write_text(jsx, encoding="utf-8")
+    print(f"Created {jsx_path}")
 
-    dest.write_text(jsx, encoding="utf-8")
-    print(f"Created {dest}")
+    # --- ASE: persistent swatch library ---
+    ase_path = dest_dir / "dysonsphere.ase"
+    _write_ase(colors, ase_path)
+    print(f"Created {ase_path}")
+
+    swatches_dir = _find_illustrator_swatches()
+    if swatches_dir is not None:
+        installed = swatches_dir / "dysonsphere.ase"
+        shutil.copy(ase_path, installed)
+        print(f"Installed to {installed}")
+        print("Restart Illustrator, then open via Open Swatch Library > User Defined > dysonsphere")
+    else:
+        print(f"Illustrator Swatches folder not found — copy {ase_path.name} there manually.")
+        print("Typical location: ~/Library/Application Support/Adobe/Adobe Illustrator <ver>/<locale>/Swatches/")

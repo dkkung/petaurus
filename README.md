@@ -184,7 +184,7 @@ The `notebook` style is useful for plotting in interactive notebooks, and defaul
 
 ## Palettes
 
-All custom palettes are built in [Oklab](https://bottosson.github.io/posts/oklab/) (Ottosson, *A perceptual color space for image processing*, 2020) for perceptual uniformity. They are stored in `dysonsphere.colors`, a plain `dict[str, list[str]]` mapping palette names to 12-stop hex lists (13 stops for diverging palettes).
+All palettes are built in [Oklab](https://bottosson.github.io/posts/oklab/) (Ottosson, *A perceptual color space for image processing*, 2020) for perceptual uniformity. They are stored in `dysonsphere.colors`, a plain `dict[str, list[str]]` mapping palette names to 12-stop hex lists (13 stops for diverging palettes).
 
 #### Accessing palettes
 
@@ -274,20 +274,24 @@ See the [palette gallery](https://dkkung.github.io/dysonsphere/) for a visual ov
 
 ### Exporting palettes as swatches for Adobe Illustrator
 
-Generate an Illustrator ExtendScript (.jsx) containing all dysonsphere palettes as named swatch groups:
-
 ```python
 ds.export_swatches()           # writes to the current directory
 ds.export_swatches("/my/dir")  # writes to a specific directory
 ```
 
-This writes `import_dysonsphere_palettes_to_illustrator.jsx`. To import into Illustrator:
+This writes two files:
 
+- `import_dysonsphere_palettes_to_illustrator.jsx` — loads all palettes into the active document's Swatches panel as named groups.
+- `dysonsphere.ase` — an ASE (Adobe Swatch Exchange) library containing all palettes. Automatically copied to your Illustrator User Defined Swatches folder if it can be found; otherwise copy it there manually.
+
+**One-time setup (persistent library):** If the ASE was installed automatically, restart Illustrator and open the library via **Open Swatch Library > User Defined > dysonsphere**. It will now be available in all documents without re-running any script.
+
+**Per-document import (active document only):**
 1. Open or create a document in Adobe Illustrator.
 2. Go to **File > Scripts > Other Script...**
 3. Select `import_dysonsphere_palettes_to_illustrator.jsx`.
-4. All palettes are added to the Swatches panel as groups named `dysonsphere [palette]` (e.g. `dysonsphere blues`).
-5. A `dysonsphere.ai` swatch library is automatically saved to your Illustrator User Defined folder. After restarting Illustrator, it appears under **Open Swatch Library > User Defined > dysonsphere**.
+
+All palettes are added to the Swatches panel as named groups (e.g. `blues`, `reds`).
 
 ---
 
