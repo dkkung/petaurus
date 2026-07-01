@@ -3,6 +3,7 @@ from __future__ import annotations
 import getpass
 import html
 import importlib.metadata
+import json
 import re
 import struct
 import sys
@@ -23,20 +24,24 @@ _AltairChart = Union[
 ]
 
 
-def _inject_png_metadata(png_bytes: bytes, description: str) -> bytes:
-    """Insert an iTXt 'Description' chunk immediately after the IHDR chunk in PNG bytes.
+def _inject_png_metadata(png_bytes: bytes, text: str, keyword: str = "Description") -> bytes:
+    """Insert an iTXt chunk (``keyword`` → ``text``) immediately after the IHDR chunk.
 
-    iTXt supports UTF-8 text (unlike tEXt which is Latin-1 only).  The chunk is inserted
-    after IHDR so metadata-aware readers encounter it before any pixel data.  All existing
-    chunks and their CRCs are left unchanged; only the new chunk's CRC is computed here.
+    Used for both the human-readable ``Description`` and the machine-readable
+    ``dysonsphere`` JSON payload.  iTXt supports UTF-8 text (unlike tEXt which is
+    Latin-1 only).  The chunk is inserted after IHDR so metadata-aware readers
+    encounter it before any pixel data.  All existing chunks and their CRCs are left
+    unchanged; only the new chunk's CRC is computed here.
     """
     chunk_type = b"iTXt"
     data = (
-        b"Description\x00"  # keyword + null terminator
-        b"\x00"  # compression flag: 0 (uncompressed)
-        b"\x00"  # compression method: 0
-        b"\x00"  # language tag: empty + null
-        b"\x00" + description.encode("utf-8")  # translated keyword: empty + null
+        keyword.encode("latin-1")
+        + b"\x00"  # keyword + null terminator
+        + b"\x00"  # compression flag: 0 (uncompressed)
+        + b"\x00"  # compression method: 0
+        + b"\x00"  # language tag: empty + null
+        + b"\x00"
+        + text.encode("utf-8")  # translated keyword: empty + null + text
     )
     crc = zlib.crc32(chunk_type + data) & 0xFFFFFFFF
     chunk = struct.pack(">I", len(data)) + chunk_type + data + struct.pack(">I", crc)
@@ -85,19 +90,32 @@ def save(
     ppi:
         Pixel density for PNG output.
     description:
-        Optional description stored in the Vega-Lite JSON spec's ``description`` field,
-        injected as a ``<desc>`` element in SVG output, and written as an ``iTXt``
-        ``Description`` chunk in PNG output.
+        Optional, purely your own text. Stored verbatim (nothing appended) in the
+        Vega-Lite JSON spec's ``description`` field, the SVG ``<desc>`` element, and the
+        PNG ``iTXt Description`` chunk. Independent of ``saveMetadata``.
     saveVegaSpec:
         If ``True``, also writes ``<filename>_vegalite.json`` containing the full Vega-Lite spec.
     saveMetadata:
-        If ``True`` (default), appends a generation info string to the description
-        (newline-separated if ``description`` is also set). Format: ``"Generated with
-        <script> by <user> using Python <ver> on <YYYYMMDD> at <HH:MM:SS> UTC using
-        altair <ver> / dysonsphere <ver>."``. In Jupyter, ``<script>`` is
-        ``"<jupyter-notebook>"``. Username falls back to ``"unknown_user"`` if the OS
-        does not expose one. Appears in the SVG ``<desc>`` element, the Vega-Lite JSON
-        spec's ``description`` field, and the PNG ``iTXt Description`` chunk.
+        If ``True`` (default), embeds a **structured JSON** metadata block —
+        ``{"provenance": {...}, "statistics": [...]}`` — in every output format so each
+        is self-contained and machine-readable:
+
+        - ``provenance`` — generation facts as fields: ``user``, ``script``,
+          ``timestamp`` (ISO-8601), ``python``, ``altair``, ``dysonsphere``. In Jupyter,
+          ``script`` is ``"<jupyter-notebook>"``; ``user`` falls back to ``"unknown_user"``.
+        - ``statistics`` — the structured records queued by ``add_comparisons`` (groups,
+          omnibus result, comparisons with exact p-values and effect sizes); omitted when
+          there are none.
+
+        It lands in the **Vega-Lite JSON** under ``usermeta.dysonsphere`` (merged into any
+        ``usermeta`` already on the chart), the **SVG** ``<metadata id="dysonsphere">``
+        element (CDATA), and the **PNG** ``iTXt dysonsphere`` chunk.
+
+        The facts are *not* also rendered as prose — that would bloat the files and
+        duplicate the structured block. For a human-readable report use
+        ``add_comparisons(report=True)`` (stdout) or ``save=`` (writes a ``.txt``).
+        ``saveMetadata=False`` suppresses the structured block entirely; your
+        ``description`` (if any) is still written.
     background:
         Which background variants to render. Defaults to ``["light", "dark"]``. Pass
         ``["light"]`` or ``["dark"]`` to render only one variant.
@@ -120,6 +138,10 @@ def save(
     if not alt.theme.options:
         raise RuntimeError("ds.theme() must be called before ds.save().")
 
+    # The `description` field (SVG <desc> / PNG Description / JSON description) carries
+    # ONLY the user's `description=` — provenance and the stats report are not rendered
+    # as prose anywhere, because they ride structured in the `dysonsphere` block below.
+    _provenance: dict | None = None
     if saveMetadata:
         try:
             _shell = get_ipython().__class__.__name__  # ty: ignore[unresolved-reference]
@@ -130,35 +152,51 @@ def save(
             _user = getpass.getuser()
         except Exception:
             _user = "unknown_user"
-        _py_ver = sys.version.split()[0]
-        _timestamp = datetime.now(timezone.utc).strftime("%Y%m%d at %H:%M:%S UTC")
-        _ds_ver = importlib.metadata.version("dysonsphere")
-        _meta = (
-            f"Generated with {_script} by {_user} using Python {_py_ver}"
-            f" on {_timestamp} using altair {alt.__version__} / dysonsphere {_ds_ver}."
-        )
-        _effective_desc: str | None = f"{description}\n{_meta}" if description is not None else _meta
-    else:
-        _effective_desc = description
+        _provenance = {
+            "user": _user,
+            "script": _script,
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "python": sys.version.split()[0],
+            "altair": alt.__version__,
+            "dysonsphere": importlib.metadata.version("dysonsphere"),
+        }
 
-    # Drain any statistical reports queued by add_pvalue() and append them to the
-    # metadata.  Always drain (so the queue does not leak into a later save), but
-    # only attach when saveMetadata is on.  See statistics._REPORTS.
+    # Drain the structured statistical records queued by add_comparisons().  Always drain
+    # (so the queue does not leak into a later save), but only embed when saveMetadata is
+    # on: the structured {provenance, statistics} block rides as JSON in the Vega-Lite
+    # usermeta, the SVG <metadata> element, and the PNG dysonsphere iTXt chunk.
     from .statistics import _drain_reports
 
-    _reports = _drain_reports()
-    if saveMetadata and _reports:
-        _report_block = "\n\n".join(_reports)
-        _effective_desc = f"{_effective_desc}\n\n{_report_block}" if _effective_desc else _report_block
+    _records = _drain_reports()
+    _usermeta: dict | None = None
+    _usermeta_json: str | None = None
+    if saveMetadata:
+        _ds_block: dict = {"provenance": _provenance}
+        if _records:
+            _ds_block["statistics"] = _records
+        _usermeta = {"dysonsphere": _ds_block}
+        # Same structured block, serialized for the SVG <metadata> and PNG iTXt so those
+        # formats are self-contained.  ensure_ascii=False keeps η²/─ literal (UTF-8).
+        _usermeta_json = json.dumps(_ds_block, ensure_ascii=False)
 
     # _resolve() is called once per variant (or once for the spec).
     # When chart is a callable it is re-invoked each time so that any
     # marks whose colours read from alt.theme.options at construction time
     # (e.g. add_multilabel dot colours) pick up the correct
     # darkmode value that was just toggled above.
+    #
+    # The chart's `description` property feeds the Vega-Lite JSON spec's description key;
+    # it holds only the user's `description=`.  (Vega-Lite's SVG renderer does not emit
+    # <desc> from this property; save() injects <desc>/<metadata> into the SVG below.)
     def _resolve() -> _AltairChart:
         c = cast(_AltairChart, chart() if callable(chart) else chart)  # ty: ignore[call-top-callable]
-        return c.properties(description=_effective_desc) if _effective_desc is not None else c
+        if description is not None:
+            c = c.properties(description=description)
+        if _usermeta is not None:
+            existing = getattr(c, "usermeta", alt.Undefined)
+            base = existing if isinstance(existing, dict) else {}
+            c = c.properties(usermeta={**base, **_usermeta})
+        return c
 
     base = Path(filename)
     original_darkmode = alt.theme.options.get("darkmode", False)
@@ -195,14 +233,23 @@ def save(
             _fix_superscript_labels(svg_path)
             with open(svg_path, encoding="utf-8") as f:
                 svg_content = f.read()
-            if _effective_desc is not None:
-                escaped = html.escape(_effective_desc)
-                svg_content = re.sub(r"(<svg[^>]*>)", rf"\1<desc>{escaped}</desc>", svg_content, count=1)
+            # Inject the user's description (<desc>) and the structured JSON (<metadata>)
+            # right after the opening <svg> tag.  A lambda replacement is used so backslashes
+            # or braces inside the JSON are inserted literally (never treated as regex refs).
+            _inserts = ""
+            if _usermeta_json is not None:
+                _inserts += f'<metadata id="dysonsphere"><![CDATA[{_usermeta_json}]]></metadata>'
+            if description is not None:
+                _inserts += f"<desc>{html.escape(description)}</desc>"
+            if _inserts:
+                svg_content = re.sub(r"(<svg[^>]*>)", lambda m: m.group(1) + _inserts, svg_content, count=1)
                 Path(svg_path).write_text(svg_content, encoding="utf-8")
             png_path = str(base.parent / f"{base.name}{suffix}.png")
             png_bytes = vlc.svg_to_png(svg_content, ppi=ppi)
-            if _effective_desc is not None:
-                png_bytes = _inject_png_metadata(png_bytes, _effective_desc)
+            if description is not None:
+                png_bytes = _inject_png_metadata(png_bytes, description)
+            if _usermeta_json is not None:
+                png_bytes = _inject_png_metadata(png_bytes, _usermeta_json, keyword="dysonsphere")
             Path(png_path).write_bytes(png_bytes)
     finally:
         alt.theme.options["darkmode"] = original_darkmode

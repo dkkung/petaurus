@@ -1,7 +1,7 @@
 """Pure statistical computation (no Altair).
 
 Backs the chart-annotation constructors in ``layers.py`` (notably
-``add_pvalue``).  Holds the omnibus tests, hand-rolled post-hoc tests,
+``add_comparisons``).  Holds the omnibus tests, hand-rolled post-hoc tests,
 effect-size functions, and the descriptive report builder.  Nothing here
 imports Altair, so it is unit-testable in isolation.
 
@@ -14,6 +14,7 @@ implemented here from scipy primitives (``rankdata``, ``norm``,
 from __future__ import annotations
 
 import math
+import sys
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -38,34 +39,68 @@ _POSTHOC_DEFAULTS = {
 # Pairwise tests usable directly (existing behaviour) or as a post-hoc fallback.
 _PAIRWISE_TESTS = {"mannwhitneyu", "ttest_ind", "ttest_rel", "wilcoxon"}
 
+# Correlation methods (add_correlation). Only "pearson" implies a straight line.
+_CORRELATION_METHODS = {
+    "pearson": ("Pearson", "r", "pearson_r"),
+    "spearman": ("Spearman", "ρ", "spearman_rho"),
+    "kendall": ("Kendall", "τ", "kendall_tau"),
+}
+
 # Post-hoc tests treated as parametric (→ Cohen's d effect size); the rest are
 # rank-based (→ rank-biserial effect size).
 _PARAMETRIC_POSTHOC = {"tukey_hsd", "games_howell", "ttest_ind", "ttest_rel"}
 
+# Human-readable names for pairwise / post-hoc tests — used for the on-plot test label.
+_TEST_DISPLAY = {
+    "mannwhitneyu": "Mann-Whitney U",
+    "ttest_ind": "Student's t-test",
+    "ttest_rel": "Paired t-test",
+    "wilcoxon": "Wilcoxon signed-rank",
+    "tukey_hsd": "Tukey HSD",
+    "dunn": "Dunn's test",
+    "nemenyi": "Nemenyi test",
+    "games_howell": "Games-Howell",
+}
+
 
 # ── Report registry ────────────────────────────────────────────────────────
-# add_pvalue() pushes each generated report here; export.save() drains it and
-# appends the text to the export metadata.  Module-level state is the only
-# channel available because Altair strips custom metadata when layers are
-# combined with ``+`` (see CLAUDE.md).
-_REPORTS: list[str] = []
+# add_comparisons() pushes a structured report *record* (a plain dict — the single
+# source of truth) here; export.save() drains it, renders the human-readable
+# text from each record for the metadata description, and embeds the raw records
+# as JSON under usermeta.dysonsphere.statistics in the Vega-Lite spec.  Module-
+# level state is the only channel available because Altair strips custom metadata
+# when layers are combined with ``+`` (see CLAUDE.md).
+_REPORTS: list[dict] = []
+
+# Machine-readable names for the effect-size symbols used in the text report.
+_EFFECT_NAMES = {
+    "η²": "eta_squared",
+    "ε²": "epsilon_squared",
+    "W": "kendalls_w",
+    "d": "cohens_d",
+    "r": "rank_biserial",
+}
 
 
-def _push_report(text: str) -> None:
-    _REPORTS.append(text)
+def _push_report(record: dict) -> None:
+    _REPORTS.append(record)
 
 
-def _drain_reports() -> list[str]:
-    """Return all queued reports (de-duplicated, order-preserving) and clear the queue.
+def _drain_reports() -> list[dict]:
+    """Return all queued report records (de-duplicated, order-preserving) and clear the queue.
 
-    De-duplication collapses the identical reports produced when ``save()`` rebuilds
-    a callable chart once per light/dark variant.
+    De-duplication collapses the identical records produced when ``save()`` rebuilds
+    a callable chart once per light/dark variant.  Records are dicts, so they are
+    compared by their canonical JSON serialization.
     """
+    import json
+
     seen: set[str] = set()
-    out: list[str] = []
+    out: list[dict] = []
     for r in _REPORTS:
-        if r not in seen:
-            seen.add(r)
+        key = json.dumps(r, sort_keys=True, default=str)
+        if key not in seen:
+            seen.add(key)
             out.append(r)
     _REPORTS.clear()
     return out
@@ -92,7 +127,7 @@ def _describe(label: str, x: np.ndarray) -> dict:
         "label": label,
         "n": int(x.size),
         "mean": float(np.mean(x)),
-        "sd": float(np.std(x, ddof=1)) if x.size > 1 else float("nan"),
+        "sd": float(np.std(x, ddof=1)) if x.size > 1 else None,
         "median": float(np.median(x)),
         "q1": float(np.percentile(x, 25)),
         "q3": float(np.percentile(x, 75)),
@@ -166,6 +201,61 @@ def _run_omnibus(test: str, groups: list[np.ndarray], labels: list) -> _OmnibusR
     res = _stats.alexandergovern(*groups)
     stat, pval = float(res.statistic), float(res.pvalue)
     return _OmnibusResult(test, name, stat, pval, "A", (k - 1,), "η²", _eta_squared(groups), descriptives)
+
+
+# ── Correlation ────────────────────────────────────────────────────────────
+def _run_correlation(method: str, x: np.ndarray, y: np.ndarray) -> dict:
+    """Compute a correlation coefficient (+ OLS fit for Pearson) between two continuous vars."""
+    from scipy import stats as _stats
+
+    if method not in _CORRELATION_METHODS:
+        raise ValueError(f"method must be one of {sorted(_CORRELATION_METHODS)}, got {method!r}")
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    _, symbol, machine = _CORRELATION_METHODS[method]
+
+    if method == "pearson":
+        res = _stats.linregress(x, y)
+        coef = float(res.rvalue)
+        return {
+            "method": method,
+            "symbol": symbol,
+            "machine": machine,
+            "coefficient": coef,
+            "rSquared": coef * coef,
+            "pvalue": float(res.pvalue),
+            "slope": float(res.slope),
+            "intercept": float(res.intercept),
+            "n": int(x.size),
+        }
+
+    res = _stats.spearmanr(x, y) if method == "spearman" else _stats.kendalltau(x, y)
+    return {
+        "method": method,
+        "symbol": symbol,
+        "machine": machine,
+        "coefficient": float(res.statistic),
+        "rSquared": None,  # not meaningful for rank correlations
+        "pvalue": float(res.pvalue),
+        "slope": None,
+        "intercept": None,
+        "n": int(x.size),
+    }
+
+
+def _make_correlation_record(result: dict, xCol: str, yCol: str) -> dict:
+    """Structured record for a correlation (the single source of truth, → usermeta)."""
+    return {
+        "kind": "correlation",
+        "method": result["method"],
+        "x": xCol,
+        "y": yCol,
+        "n": result["n"],
+        "coefficient": {"name": result["machine"], "symbol": result["symbol"], "value": result["coefficient"]},
+        "rSquared": result["rSquared"],
+        "pvalue": _clamp_p(result["pvalue"]),
+        "fit": None if result["slope"] is None else {"slope": result["slope"], "intercept": result["intercept"]},
+    }
 
 
 # ── Post-hoc tests (hand-rolled) ───────────────────────────────────────────
@@ -325,57 +415,153 @@ def _pair_effect(a: np.ndarray, b: np.ndarray, *, parametric: bool, paired: bool
     return "r", _rank_biserial(a, b)
 
 
-# ── Report builder ─────────────────────────────────────────────────────────
-def _fmt(x: float, decimals: int = 3) -> str:
-    return f"{x:.{decimals}f}"
+# ── Report record (single source of truth) ─────────────────────────────────
+def _clamp_p(p: float) -> float:
+    """Clamp a p-value away from an impossible ``0.0``.
 
-
-def _fmt_p(p: float, decimals: int = 3) -> str:
-    threshold = 10 ** (-decimals)
-    return f"< {_fmt(threshold, decimals)}" if p < threshold else f"= {_fmt(p, decimals)}"
-
-
-def _build_report(
-    *,
-    title: str,
-    descriptives: list[dict],
-    omnibus: _OmnibusResult | None = None,
-    comparisons: list[dict] | None = None,
-    comparisonName: str | None = None,
-    comparisonLabel: str = "Post-hoc",
-) -> str:
-    """Assemble the plain-text descriptive + effect-size report.
-
-    ``comparisons`` is a list of dicts with keys ``g1``, ``g2``, ``pvalue`` and
-    optionally ``effectName``/``effect``.
+    A p-value is strictly positive; scipy returns ``0.0`` only when the true value
+    underflows below the smallest representable float.  We store the smallest positive
+    float instead, so the record (and the JSON) never claim ``P = 0``.  The text report
+    renders this clamp value with ``<`` (see ``_fmt_p``) because the true value is
+    genuinely below float precision.
     """
-    lines: list[str] = [f"=== {title} ==="]
+    return sys.float_info.min if p == 0.0 else p
 
+
+def _make_record(
+    *,
+    test: str,
+    is_omnibus: bool,
+    omnibus: _OmnibusResult | None,
+    descriptives: list[dict],
+    comparisons: list[dict],
+    comparison_test: str | None,
+    correction: str | None,
+    pvalues_provided: bool,
+) -> dict:
+    """Build the structured report record.
+
+    This dict is the single source of truth: ``_render_report`` turns it into the
+    plain-text report, and ``export.save`` embeds it verbatim under
+    ``usermeta.dysonsphere.statistics``.  ``comparisons`` is the internal list of
+    dicts with keys ``g1``/``g2``/``pvalue`` and optionally ``effectName``/``effect``.
+    """
+
+    def _effect(symbol: str | None, value) -> dict | None:
+        if symbol is None:
+            return None
+        return {"name": _EFFECT_NAMES.get(symbol, symbol), "symbol": symbol, "value": value}
+
+    record: dict = {
+        "kind": "omnibus" if is_omnibus else "pairwise",
+        "test": None if pvalues_provided else test,
+        "groups": descriptives,
+    }
     if omnibus is not None:
-        df_str = ", ".join(str(d) for d in omnibus.df)
-        stat = f"{omnibus.statSymbol}({df_str}) = {_fmt(omnibus.stat, 3)}"
-        lines.append(f"{omnibus.name}: {stat}, P {_fmt_p(omnibus.pvalue)}")
-        lines.append(f"Effect size: {omnibus.effectName} = {_fmt(omnibus.effectSize, 3)}")
+        record["omnibus"] = {
+            "name": omnibus.name,
+            "statistic": {"symbol": omnibus.statSymbol, "value": omnibus.stat, "df": list(omnibus.df)},
+            "pvalue": _clamp_p(omnibus.pvalue),
+            "effect": _effect(omnibus.effectName, omnibus.effectSize),
+        }
+    record["comparisons"] = {
+        "test": comparison_test,
+        "correction": correction,
+        "pairs": [
+            {
+                "group1": c["g1"],
+                "group2": c["g2"],
+                "pvalue": _clamp_p(c["pvalue"]),
+                "effect": _effect(c.get("effectName"), c.get("effect")),
+            }
+            for c in comparisons
+        ],
+    }
+    return record
+
+
+# ── Text report (rendered from a record) ───────────────────────────────────
+def _fmt(x: float | None, decimals: int = 3) -> str:
+    return "n/a" if x is None else f"{x:.{decimals}f}"
+
+
+def _fmt_p(p: float) -> str:
+    """Format a report p-value at 3 significant figures — never floored.
+
+    ``%g`` keeps ordinary p-values as readable decimals (``= 0.032``) and switches
+    tiny ones to e-notation (``= 1.22e-11``) automatically.  This is the *record*
+    format and is independent of the on-plot label style (``notation``/``decimals``).
+    The one clamp-value (see ``_clamp_p``) is rendered with ``<`` because the true
+    value is genuinely below float precision.
+    """
+    if p == sys.float_info.min:
+        return f"< {sys.float_info.min:.3g}"
+    return f"= {p:.3g}"
+
+
+def _render_correlation(record: dict) -> str:
+    method = _CORRELATION_METHODS[record["method"]][0]
+    title = f"Statistics | Correlation | {method}"
+    lines: list[str] = [title, "─" * len(title), ""]
+    c = record["coefficient"]
+    parts = [f"{c['symbol']} = {_fmt(c['value'])}"]
+    if record["rSquared"] is not None:
+        parts.append(f"r² = {_fmt(record['rSquared'])}")
+    parts.append(f"P {_fmt_p(record['pvalue'])}")
+    lines.append(", ".join(parts))
+    if record["fit"] is not None:
+        f = record["fit"]
+        sign = "+" if f["intercept"] >= 0 else "-"
+        lines.append(f"Fit: y = {_fmt(f['slope'])}x {sign} {_fmt(abs(f['intercept']))}")
+    lines.append(f"n = {record['n']}  ({record['x']} vs {record['y']})")
+    return "\n".join(lines)
+
+
+def _render_report(record: dict) -> str:
+    """Render the plain-text descriptive + effect-size report from a record dict."""
+    if record["kind"] == "correlation":
+        return _render_correlation(record)
+    if record["kind"] == "omnibus":
+        title = f"Statistics | Omnibus | {record['omnibus']['name']}"
+    elif record["test"] is None:
+        title = "Statistics | Pairwise comparisons | user p-values"
+    else:
+        title = f"Statistics | Pairwise comparisons | {record['test']}"
+
+    lines: list[str] = [title, "─" * len(title), ""]
+
+    if record["kind"] == "omnibus":
+        o = record["omnibus"]
+        df_str = ", ".join(str(d) for d in o["statistic"]["df"])
+        stat = f"{o['statistic']['symbol']}({df_str}) = {_fmt(o['statistic']['value'])}"
+        lines.append(f"{stat}, P {_fmt_p(o['pvalue'])}")
+        lines.append(f"Effect size: {o['effect']['symbol']} = {_fmt(o['effect']['value'])}")
         lines.append("")
 
     lines.append("Group descriptives:")
-    width = max((len(d["label"]) for d in descriptives), default=0)
-    for d in descriptives:
+    groups = record["groups"]
+    width = max((len(g["label"]) for g in groups), default=0)
+    for g in groups:
         lines.append(
-            f"  {d['label']:<{width}}  n={d['n']:<4d} mean={_fmt(d['mean'])}  sd={_fmt(d['sd'])}  "
-            f"median={_fmt(d['median'])}  IQR=[{_fmt(d['q1'])}, {_fmt(d['q3'])}]  "
-            f"range=[{_fmt(d['min'])}, {_fmt(d['max'])}]"
+            f"  {g['label']:<{width}}  n={g['n']:<4d} mean={_fmt(g['mean'])}  sd={_fmt(g['sd'])}  "
+            f"median={_fmt(g['median'])}  IQR=[{_fmt(g['q1'])}, {_fmt(g['q3'])}]  "
+            f"range=[{_fmt(g['min'])}, {_fmt(g['max'])}]"
         )
 
-    if comparisons:
+    pairs = record["comparisons"]["pairs"]
+    if pairs:
+        name = record["comparisons"]["test"]
+        corr = record["comparisons"].get("correction")
+        label = "Post-hoc" if record["kind"] == "omnibus" else "Comparisons"
+        suffix = ", ".join(x for x in (name, corr) if x)
         lines.append("")
-        lines.append(f"{comparisonLabel}{f' ({comparisonName})' if comparisonName else ''}:")
-        pair_width = max(len(f"{c['g1']} vs {c['g2']}") for c in comparisons)
-        for c in comparisons:
-            pair = f"{c['g1']} vs {c['g2']}"
-            line = f"  {pair:<{pair_width}}  P {_fmt_p(c['pvalue'])}"
-            if c.get("effectName") is not None:
-                line += f"  {c['effectName']} = {_fmt(c['effect'])}"
+        lines.append(f"{label}{f' ({suffix})' if suffix else ''}:")
+        pair_width = max(len(f"{p['group1']} vs {p['group2']}") for p in pairs)
+        for p in pairs:
+            pair = f"{p['group1']} vs {p['group2']}"
+            line = f"  {pair:<{pair_width}}  P {_fmt_p(p['pvalue'])}"
+            if p["effect"] is not None:
+                line += f"  {p['effect']['symbol']} = {_fmt(p['effect']['value'])}"
             lines.append(line)
 
     return "\n".join(lines)

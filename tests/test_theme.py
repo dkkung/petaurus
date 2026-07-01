@@ -63,6 +63,46 @@ class TestThemeDefaults:
         theme(darkmode=True)
         assert alt.theme.options["chartFill"] is None
 
+    def test_secondary_font_size_default(self):
+        theme()  # fontSize=7
+        assert alt.theme.options["secondaryFontSize"] == 6  # fontSize - 1
+
+    def test_secondary_font_size_scales(self):
+        theme(fontSize=12)
+        assert alt.theme.options["secondaryFontSize"] == 11
+
+    def test_secondary_font_size_explicit(self):
+        theme(fontSize=12, secondaryFontSize=8)
+        assert alt.theme.options["secondaryFontSize"] == 8
+
+    def test_secondary_font_size_floored_at_smallest(self):
+        theme(fontSize=5)  # fontSize - 1 = 4, but floored to smallestFontSize (5)
+        assert alt.theme.options["secondaryFontSize"] == 5
+
+    def test_secondary_font_size_escape_hatch_below_floor(self):
+        theme(fontSize=3)  # fontSize < smallest → floor bypassed, tier follows the base
+        assert alt.theme.options["secondaryFontSize"] == 2  # max(1, 3 - 1)
+
+    def test_smallest_font_size_default(self):
+        theme()
+        assert alt.theme.options["smallestFontSize"] == 5  # fixed floor, not derived
+
+    def test_smallest_font_size_custom_int(self):
+        theme(smallestFontSize=4)
+        assert alt.theme.options["smallestFontSize"] == 4
+        assert alt.theme.options["fontSize"] == 7  # int does not minimize
+
+    def test_smallest_font_size_true_minimizes_and_floors_secondary(self):
+        theme(smallestFontSize=True)
+        assert alt.theme.options["fontSize"] == 5  # base dropped to the floor
+        assert alt.theme.options["secondaryFontSize"] == 5  # tier floored too, not 4
+        assert alt.theme.options["smallestFontSize"] == 5
+
+    def test_smallest_font_size_false_is_retrievable_int(self):
+        theme(smallestFontSize=False)
+        assert alt.theme.options["smallestFontSize"] == 5
+        assert alt.theme.options["fontSize"] == 7  # no minimize
+
     def test_options_reset_on_each_call(self):
         theme(grid=True)
         assert alt.theme.options["grid"] is True
@@ -78,6 +118,64 @@ class TestThemeDefaults:
     def test_palette_unknown_string_passed_through(self):
         theme(palette="tableau10")
         assert alt.theme.options["palette"] == "tableau10"
+
+
+class TestRangePalettes:
+    def _scheme(self, kind):
+        return _dysonsphere_theme()["config"]["range"][kind]["scheme"]
+
+    def test_defaults_unchanged(self):
+        from dysonsphere.palettes import colors
+
+        theme()
+        assert self._scheme("category") == colors["blues"][::2]
+        assert self._scheme("diverging") == colors["redsblues"]
+
+    def test_per_type_override_by_name(self):
+        from dysonsphere.palettes import colors
+
+        theme(categoryPalette="reds")
+        assert self._scheme("category") == colors["reds"]
+        assert self._scheme("diverging") == colors["redsblues"]  # others untouched
+
+    def test_per_type_override_raw_list(self):
+        theme(rampPalette=["#ffffff", "#000000"])
+        assert self._scheme("ramp") == ["#ffffff", "#000000"]
+
+    def test_per_type_vega_scheme_passthrough(self):
+        theme(heatmapPalette="viridis")
+        assert self._scheme("heatmap") == "viridis"
+
+    def test_global_palette_wins_over_per_type(self):
+        from dysonsphere.palettes import colors
+
+        theme(palette="greens", categoryPalette="reds")
+        assert self._scheme("category") == colors["greens"]
+
+    def test_global_palette_still_fills_all(self):
+        from dysonsphere.palettes import colors
+
+        theme(palette="greens")
+        for kind in ("category", "diverging", "heatmap", "ordinal", "ramp"):
+            assert self._scheme(kind) == colors["greens"]
+
+    def test_per_type_from_custom_palette(self, tmp_path, monkeypatch):
+        from dysonsphere.palettes import colors
+
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "dysonsphere.toml").write_text('[palettes]\nmine = ["#111111", "#222222"]\n', encoding="utf-8")
+        theme(categoryPalette="mine")
+        assert self._scheme("category") == ["#111111", "#222222"]
+        theme()  # reset custom palette state
+        assert self._scheme("category") == colors["blues"][::2]
+
+    def test_per_type_via_toml(self, tmp_path, monkeypatch):
+        from dysonsphere.palettes import colors
+
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "dysonsphere.toml").write_text('[default]\ndivergingPalette = "greensblues"\n', encoding="utf-8")
+        theme()
+        assert self._scheme("diverging") == colors["greensblues"]
 
 
 class TestThemeRegistration:

@@ -1,11 +1,11 @@
 """
-Generates docs/pvalue_example_light.png — the README preview for add_pvalue.
+Generates docs/pairwise_example_light.png — the README preview for add_comparisons.
 
 Shows labelStyle="p", notation="scientific", and labelStyle="asterisks" on the
-same three-group comparison, plus a reverse-bracket demo on the right.
+same three-group comparison, plus a reverse-bracket + test-name-label demo on the right.
 
 Usage (from project root):
-    uv run python scripts/build/build_pvalue_example.py
+    uv run python scripts/build/build_pairwise_example.py
 """
 
 import tempfile
@@ -87,13 +87,13 @@ pvalue_kwargs: dict[str, Any] = dict(
 title_params: dict[str, Any] = dict(orient="top", anchor="start", offset=4)
 fontSize = alt.theme.options.get("fontSize", 7)
 
-left = (left_base + ds.add_pvalue(**pvalue_kwargs, labelStyle="p")).properties(
+left = (left_base + ds.add_comparisons(**pvalue_kwargs, labelStyle="p", bracketStyle="line")).properties(
     title=alt.TitleParams(['labelStyle="p"', 'bracketStyle="line"'], fontSize=fontSize, **title_params)
 )
 scientific = (
-    scientific_base + ds.add_pvalue(**pvalue_kwargs, labelStyle="p", notation="scientific", decimals=2)
+    scientific_base + ds.add_comparisons(**pvalue_kwargs, labelStyle="p", notation="scientific", decimals=2)
 ).properties(title=alt.TitleParams(['labelStyle="p"', 'notation="scientific"'], fontSize=fontSize, **title_params))
-right = (right_base + ds.add_pvalue(**pvalue_kwargs, labelStyle="asterisks", bracketStyle="bracket")).properties(
+right = (right_base + ds.add_comparisons(**pvalue_kwargs, labelStyle="asterisks", bracketStyle="bracket")).properties(
     title=alt.TitleParams(
         ['labelStyle="asterisks"', 'bracketStyle="bracket"'],
         fontSize=fontSize,
@@ -109,7 +109,7 @@ third_base = (
 )
 third = (
     third_base
-    + ds.add_pvalue(
+    + ds.add_comparisons(
         third_df,
         "group",
         "value",
@@ -118,12 +118,12 @@ third = (
         bracketStyle="bracket",
         yStart=float(third_df["value"].min()) - 0.25,  # ty: ignore[invalid-argument-type]
         yStep=-0.5,
-        tickHeight=0.15,
         reverse=[("A", "B")],
+        testLabelPosition="topLeft",  # → "Mann-Whitney U" (the default pairwise test)
     )
 ).properties(
     title=alt.TitleParams(
-        ['bracketStyle="bracket"', 'reverse=[("A", "B")]'],
+        ['reverse=[("A", "B")]', 'testLabelPosition="topLeft"'],
         fontSize=fontSize,
         **title_params,
     )
@@ -131,7 +131,7 @@ third = (
 
 chart = alt.hconcat(left, scientific, right, third)
 
-out_png = ROOT / "docs" / "pvalue_example_light.png"
+out_png = ROOT / "docs" / "pairwise_example_light.png"
 with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as tmp:
     tmp_path = tmp.name
 chart.save(tmp_path)

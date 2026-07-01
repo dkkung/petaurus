@@ -821,7 +821,7 @@ def _pvalue_layer(
     y: float | None = None,
     y_pad: float = 5,
     tick_height: float = 0.5,
-    bracket_style: str = "line",
+    bracket_style: str = "bracket",
     label_style: str = "p",
     categories: list | None = None,
     chartWidth: int | None = None,
@@ -884,7 +884,7 @@ def _pvalue_layer(
     if strokeWidth is None:
         strokeWidth = alt.theme.options.get("axisWidth", 0.5)
     if fontSize is None:
-        fontSize = 6
+        fontSize = alt.theme.options.get("fontSize", 7)
 
     # --- categories and text x position ---
     if categories is None:
@@ -964,13 +964,14 @@ def _pvalue_layer(
 _MATRIX_POSTHOCS = {"tukey_hsd", "dunn", "nemenyi", "games_howell"}
 
 
-def _omnibus_label(result, *, verbose: bool, labelStyle: str, notation: str | None, decimals: int) -> str:
-    """Build the terse or verbose corner-label string from an omnibus result."""
-    p_str = (
-        _format_asterisks(result.pvalue)
-        if labelStyle == "asterisks"
-        else _format_pvalue(result.pvalue, decimals=decimals, notation=notation)
-    )
+def _omnibus_label(result, *, verbose: bool, notation: str | None, decimals: int) -> str:
+    """Build the terse or verbose corner-label string from an omnibus result.
+
+    Always uses the p-value format (never asterisks) — ``labelStyle="asterisks"``
+    only applies to the pairwise brackets; an omnibus *result* readout like
+    ``Kruskal-Wallis ***`` reads oddly.
+    """
+    p_str = _format_pvalue(result.pvalue, decimals=decimals, notation=notation)
     if not verbose:
         return f"{result.name} {p_str}"
     df_str = ", ".join(str(d) for d in result.df)
@@ -1011,7 +1012,7 @@ def _bracket_pvalues(
     raise ValueError(f"Unknown test/postHoc {method!r}. Choose from: {sorted(_MATRIX_POSTHOCS | _PAIRWISE_TESTS)}")
 
 
-def add_pvalue(
+def add_comparisons(
     df: pl.DataFrame | Any,
     xCol: str,
     yCol: str,
@@ -1028,7 +1029,7 @@ def add_pvalue(
     yPad: float | None = None,
     categories: list | None = None,
     chartWidth: int | None = None,
-    bracketStyle: str = "line",
+    bracketStyle: str = "bracket",
     labelStyle: str = "p",
     tickHeight: float | None = None,
     strokeWidth: float | None = None,
@@ -1036,11 +1037,13 @@ def add_pvalue(
     reverse: list[tuple[str, str]] | None = None,
     decimals: int = 3,
     notation: str | None = None,
-    omnibusPosition: str | None = "topLeft",
-    omnibusLabel: str | None = None,
+    testLabelPosition: str | None = "auto",
+    testLabel: str | None = None,
     omnibusVerbose: bool = False,
-    omnibusOffsetX: int = 0,
-    omnibusOffsetY: int = 0,
+    testLabelOffsetX: int = 0,
+    testLabelOffsetY: int = 0,
+    testLabelX=None,
+    testLabelY=None,
     report: bool = False,
     save: bool | str = False,
 ) -> alt.LayerChart:
@@ -1056,13 +1059,13 @@ def add_pvalue(
     - **Omnibus** (``'anova'``, ``'kruskal'``, ``'friedman'``,
       ``'alexandergovern'``) — runs one "are *any* groups different?" test and
       places its result as a corner label via ``add_text`` (see
-      ``omnibusPosition``). If ``pairs`` is also given, a post-hoc test (see
+      ``testLabelPosition``). If ``pairs`` is also given, a post-hoc test (see
       ``postHoc``) fills the brackets.
 
     A descriptive + effect-size report is generated on every call and queued for
     the export metadata written by ``ds.save()`` (see ``report``/``save``).
 
-    Combine with your chart using ``+``:  ``chart + add_pvalue(...)``.
+    Combine with your chart using ``+``:  ``chart + add_comparisons(...)``.
 
     Parameters
     ----------
@@ -1125,19 +1128,21 @@ def add_pvalue(
         Width of the chart in pixels, used to compute text x positions.
         Auto-detected from ``ds.theme()`` when not set.
     bracketStyle:
-        ``'line'`` (horizontal bar only) or ``'bracket'`` (bar + end ticks).
+        ``'bracket'`` (default; bar + end ticks) or ``'line'`` (horizontal bar only).
     labelStyle:
         ``'p'`` (default) renders ``P = 0.012`` / ``P < 0.001``. ``'asterisks'``
         renders ``*`` / ``**`` / ``***`` / ``ns``.
     tickHeight:
-        Height of bracket end ticks in data units. Defaults to
-        ``yStep * 0.25`` so ticks scale naturally with bracket spacing.
-        Only used when ``bracketStyle='bracket'``.
+        Height of bracket end ticks in data units. Defaults to the theme's
+        ``tickSize`` (converted from px to data units), so bracket ticks match the
+        axis ticks. Always positive, so it works with reverse (negative-``yStep``)
+        brackets without an explicit override. Only used when ``bracketStyle='bracket'``.
     strokeWidth:
         Stroke width of bracket lines. Inherits ``axisWidth`` from
         ``ds.theme()`` when not set.
     fontSize:
-        Font size of p-value labels. Defaults to ``6``.
+        Font size of the p-value / corner labels. Defaults to the theme's
+        ``secondaryFontSize`` (``fontSize - 1``, i.e. ``6`` at the default ``fontSize=7``).
     reverse:
         List of ``(group1, group2)`` tuples identifying brackets to flip —
         text moves below the bar and ticks point upward.
@@ -1154,20 +1159,27 @@ def add_pvalue(
         rounds to the nearest power of 10 giving ``P ≈ 10⁻²`` — note that
         values within the same decade (e.g. 0.04 and 0.06) map to the same
         label; best for p-values spanning multiple orders of magnitude.
-    omnibusPosition:
+    testLabelPosition:
         Corner preset (an ``add_text`` position, e.g. ``'topLeft'``,
-        ``'bottomRight'``) for the omnibus label. Default ``'topLeft'``. Set to
-        ``None`` to compute the omnibus result for the report/metadata but draw
-        no label. Ignored for pairwise ``test``.
-    omnibusLabel:
-        Override string for the omnibus corner label. ``None`` (default) builds
-        it from the test result.
+        ``'bottomRight'``) for the single test label. Its content adapts: the
+        omnibus **result** (``ANOVA P = 0.003``) for an omnibus ``test``, or the
+        pairwise **test name** (``Mann-Whitney U``) for a pairwise ``test``.
+        Default ``'auto'`` → shown at ``'topLeft'`` for omnibus, hidden for
+        pairwise (opt-in). A preset draws it there; ``None`` hides it (the result
+        is still computed for the report/metadata).
+    testLabel:
+        Override string for the test label. ``None`` (default) builds it from the
+        test result / name.
     omnibusVerbose:
-        ``False`` (default) → terse label ``ANOVA P = 0.003``. ``True`` →
-        ``ANOVA F(2, 57) = 6.34, P = 0.003, η² = 0.18`` (statistic, df, p, and
-        effect size, with the right symbols per test).
-    omnibusOffsetX, omnibusOffsetY:
-        Pixel nudges for the omnibus label, forwarded to ``add_text``.
+        Applies to the omnibus label content: ``False`` (default) → terse
+        ``ANOVA P = 0.003``; ``True`` → ``ANOVA F(2, 57) = 6.34, P = 0.003,
+        η² = 0.18`` (statistic, df, p, and effect size).
+    testLabelOffsetX, testLabelOffsetY:
+        Pixel nudges for the test label, forwarded to ``add_text``.
+    testLabelX, testLabelY:
+        Explicit coordinates for the test label (data values, category names, or
+        ``alt.value(px)``), forwarded to ``add_text`` where they override the
+        preset. ``None`` (default) uses ``testLabelPosition``.
     report:
         ``True`` prints the full descriptive + effect-size report (per-group
         n/mean/sd/median/IQR/range, the omnibus result, and the post-hoc
@@ -1188,7 +1200,7 @@ def add_pvalue(
 
         CATEGORIES = ["A", "B", "C"]
         chart = ds.mark_strip(df, "group", "value", CATEGORIES)
-        chart + ds.add_pvalue(
+        chart + ds.add_comparisons(
             df, "group", "value",
             pairs=[("A", "B")],
             categories=CATEGORIES,
@@ -1196,7 +1208,7 @@ def add_pvalue(
 
     Multiple comparisons — brackets stacked automatically::
 
-        chart + ds.add_pvalue(
+        chart + ds.add_comparisons(
             df, "group", "value",
             pairs=[("A", "B"), ("A", "C"), ("B", "C")],
             test="mannwhitneyu",
@@ -1205,7 +1217,7 @@ def add_pvalue(
 
     Omnibus ANOVA in the corner + Tukey post-hoc brackets::
 
-        chart + ds.add_pvalue(
+        chart + ds.add_comparisons(
             df, "group", "value",
             pairs=[("A", "B"), ("A", "C")],
             test="anova",
@@ -1215,7 +1227,7 @@ def add_pvalue(
 
     Omnibus-only (no brackets), report printed::
 
-        chart + ds.add_pvalue(
+        chart + ds.add_comparisons(
             df, "group", "value",
             test="kruskal",
             categories=CATEGORIES,
@@ -1224,7 +1236,7 @@ def add_pvalue(
 
     From pre-computed p-values::
 
-        chart + ds.add_pvalue(
+        chart + ds.add_comparisons(
             df, "group", "value",
             pairs=[("A", "B"), ("A", "C")],
             pvalues=[0.012, 0.341],
@@ -1238,10 +1250,12 @@ def add_pvalue(
         _OMNIBUS_TESTS,
         _PARAMETRIC_POSTHOC,
         _POSTHOC_DEFAULTS,
-        _build_report,
+        _TEST_DISPLAY,
         _describe_all,
+        _make_record,
         _pair_effect,
         _push_report,
+        _render_report,
         _run_omnibus,
     )
     from .utils import ensure_polars
@@ -1265,32 +1279,9 @@ def add_pvalue(
     omnibus_result = None
     comparisons: list[dict] = []
     comparison_name: str | None = None
-    comparison_label = "Post-hoc"
 
-    # --- omnibus corner label ---
     if is_omnibus:
         omnibus_result = _run_omnibus(test, groups, categories)
-        if omnibusPosition is not None:
-            text = (
-                omnibusLabel
-                if omnibusLabel is not None
-                else _omnibus_label(
-                    omnibus_result,
-                    verbose=omnibusVerbose,
-                    labelStyle=labelStyle,
-                    notation=notation,
-                    decimals=decimals,
-                )
-            )
-            annotation_layers.append(
-                add_text(
-                    text,
-                    position=omnibusPosition,
-                    offsetX=omnibusOffsetX,
-                    offsetY=omnibusOffsetY,
-                    fontSize=fontSize if fontSize is not None else 6,
-                )
-            )
 
     # --- resolve comparison method (a post-hoc for omnibus, the test itself for pairwise) ---
     idx = {c: i for i, c in enumerate(categories)}
@@ -1302,7 +1293,30 @@ def add_pvalue(
     else:
         method = test
     comparison_name = method
-    comparison_label = "Post-hoc" if is_omnibus else "Comparisons"
+    # tukey_hsd carries its own correction; explicit p-values aren't corrected by us.
+    effective_correction = None if (method is None or method == "tukey_hsd") else correction
+
+    # --- unified test label: the omnibus result, or the pairwise/post-hoc test name ---
+    # Position "auto" (default) → shown for omnibus (topLeft), hidden for pairwise.
+    resolved_pos = ("topLeft" if is_omnibus else None) if testLabelPosition == "auto" else testLabelPosition
+    if resolved_pos is not None or testLabelX is not None or testLabelY is not None:
+        if testLabel is not None:
+            label_text = testLabel
+        elif is_omnibus:
+            label_text = _omnibus_label(omnibus_result, verbose=omnibusVerbose, notation=notation, decimals=decimals)
+        else:
+            label_text = _TEST_DISPLAY.get(test, test)
+        annotation_layers.append(
+            add_text(
+                label_text,
+                testLabelX,
+                testLabelY,
+                position=resolved_pos,
+                offsetX=testLabelOffsetX,
+                offsetY=testLabelOffsetY,
+                fontSize=fontSize if fontSize is not None else alt.theme.options.get("fontSize", 7),
+            )
+        )
 
     # --- report comparisons ---
     # Omnibus reports ALL pairwise post-hoc comparisons (the full picture), even when
@@ -1337,35 +1351,31 @@ def add_pvalue(
             computed_pvalues = [pval_lookup[frozenset((g1, g2))] for g1, g2 in pairs]
 
         # --- y positioning ---
+        annotated_groups_for_pad = list({g for pair in pairs for g in pair})
+        y_vals = df.filter(pl.col(xCol).is_in(annotated_groups_for_pad))[yCol]
+        y_range = cast(float, y_vals.cast(pl.Float64).max() or 0.0) - cast(float, y_vals.cast(pl.Float64).min() or 0.0)
+        chart_height = alt.theme.options.get("chartHeight", 100)
         if yPad is None:
-            annotated_groups_for_pad = list({g for pair in pairs for g in pair})
-            y_vals = df.filter(pl.col(xCol).is_in(annotated_groups_for_pad))[yCol]
-            y_range = cast(float, y_vals.cast(pl.Float64).max() or 0.0) - cast(
-                float, y_vals.cast(pl.Float64).min() or 0.0
-            )
-            chart_height = alt.theme.options.get("chartHeight", 100)
             yPad = (10.0 if bracketStyle == "bracket" else 8.0) * y_range / chart_height
+        # Bracket end-tick height matches the theme's tickSize (px → data units). Always
+        # positive, so it no longer flips sign with a negative yStep (reverse brackets).
+        if tickHeight is None:
+            tickHeight = alt.theme.options.get("tickSize", 3) * y_range / chart_height if chart_height else 0.0
 
         if yPositions is not None:
             final_y = list(yPositions)
-            if tickHeight is None:
-                tickHeight = (yPad * 2) * 0.25
         else:
             if yStart is None:
-                annotated_groups = list({g for pair in pairs for g in pair})
                 yStart = (
                     cast(
                         float,
-                        df.filter(pl.col(xCol).is_in(annotated_groups))[yCol].cast(pl.Float64).max() or 0.0,
+                        df.filter(pl.col(xCol).is_in(annotated_groups_for_pad))[yCol].cast(pl.Float64).max() or 0.0,
                     )
                     + yPad
                 )
 
             if yStep is None:
                 yStep = yPad * 2
-
-            if tickHeight is None:
-                tickHeight = yStep * 0.25
 
             # Assign stacking levels via greedy interval scheduling.
             # Shorter spans go to lower levels so narrow brackets sit closer to the data.
@@ -1414,25 +1424,261 @@ def add_pvalue(
                 )
             )
 
-    # --- report: always queued for export metadata; printed when report=True ---
-    report_text = _build_report(
-        title=omnibus_result.name if omnibus_result is not None else "Pairwise comparisons",
-        descriptives=_describe_all(groups, categories),
+    # --- report: a structured record is always queued for export metadata; ---
+    # --- rendered to text when report=True (print) or save is set (file).   ---
+    record = _make_record(
+        test=test,
+        is_omnibus=is_omnibus,
         omnibus=omnibus_result,
-        comparisons=comparisons or None,
-        comparisonName=comparison_name,
-        comparisonLabel=comparison_label,
+        descriptives=_describe_all(groups, categories),
+        comparisons=comparisons,
+        comparison_test=comparison_name,
+        correction=effective_correction,
+        pvalues_provided=pvalues is not None,
     )
-    _push_report(report_text)
-    if report:
-        print(report_text)
-    if save:
-        directory = Path(save) if isinstance(save, str) else Path.cwd()
-        directory.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        (directory / f"dysonsphere_report_{ts}.txt").write_text(report_text + "\n", encoding="utf-8")
+    _push_report(record)
+    if report or save:
+        report_text = _render_report(record)
+        if report:
+            print(report_text)
+        if save:
+            directory = Path(save) if isinstance(save, str) else Path.cwd()
+            directory.mkdir(parents=True, exist_ok=True)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            (directory / f"dysonsphere_report_{ts}.txt").write_text(report_text + "\n", encoding="utf-8")
 
     if not annotation_layers:
-        # omnibusPosition=None with no pairs → report-only; return an invisible layer.
+        # no label and no brackets → report-only; return an invisible layer.
         annotation_layers.append(alt.Chart(alt.Data(values=[{}])).mark_point(opacity=0))
     return cast(alt.LayerChart, alt.layer(*annotation_layers))
+
+
+# DEPRECATED(remove in v2.0): add_pvalue() was renamed to add_comparisons() in v1.1.
+def add_pvalue(*args, **kwargs) -> alt.LayerChart:
+    """Deprecated alias for :func:`add_comparisons`. Will be removed in dysonsphere 2.0."""
+    import warnings
+
+    warnings.warn(
+        "add_pvalue() is deprecated and will be removed in dysonsphere 2.0; use add_comparisons() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return add_comparisons(*args, **kwargs)
+
+
+# Correlation
+
+
+def _correlation_label(
+    result: dict, *, coefficient: str, includePvalue: bool, includeEquation: bool, decimals: int, notation: str | None
+) -> str:
+    """Build the corner-readout string from a correlation result, one part at a time."""
+    is_pearson = result["rSquared"] is not None  # only Pearson has r²/slope
+    parts: list[str] = []
+    if not is_pearson:
+        parts.append(f"{result['symbol']} = {result['coefficient']:.2f}")  # ρ/τ always
+    else:
+        if coefficient in ("r", "both"):
+            parts.append(f"r = {result['coefficient']:.2f}")
+        if coefficient in ("r2", "both"):
+            parts.append(f"r² = {result['rSquared']:.2f}")
+    if includePvalue:
+        parts.append(_format_pvalue(result["pvalue"], decimals=decimals, notation=notation))
+    label = ", ".join(parts)
+    if includeEquation and result["slope"] is not None:
+        sign = "+" if result["intercept"] >= 0 else "-"
+        label += f", y = {result['slope']:.2f}x {sign} {abs(result['intercept']):.2f}"
+    return label
+
+
+def add_correlation(
+    df: pl.DataFrame | Any,
+    xCol: str,
+    yCol: str,
+    *,
+    method: str = "pearson",
+    line: bool = True,
+    position: str | None = "topLeft",
+    label: str | None = None,
+    coefficient: str = "r",
+    includePvalue: bool = False,
+    includeEquation: bool = False,
+    verbose: bool = False,
+    offsetX: int = 0,
+    offsetY: int = 0,
+    fontSize: int | None = None,
+    decimals: int = 3,
+    notation: str | None = None,
+    color: str | None = None,
+    strokeWidth: float | None = None,
+    strokeDash: bool | list[int] | None = None,
+    opacity: float | None = None,
+    lineStyle: dict | None = None,
+    report: bool = False,
+    save: bool | str = False,
+) -> alt.LayerChart:
+    """
+    Annotate a scatter with a correlation coefficient (and an OLS fit line for Pearson).
+
+    Reports the coefficient as a corner label, and — for ``method="pearson"``
+    only — draws the ordinary-least-squares regression line. A structured record
+    (``kind="correlation"``) is queued for the export metadata (see ``ds.save``),
+    exactly like ``add_comparisons``.
+
+    Combine with your scatter using ``+``:  ``chart + add_correlation(...)``.
+
+    Parameters
+    ----------
+    df:
+        DataFrame containing the data (polars or pandas).
+    xCol, yCol:
+        Column names for the two **continuous** variables.
+    method:
+        ``'pearson'`` (default) — linear correlation ``r`` + ``r²`` + slope/intercept,
+        with an OLS line. ``'spearman'`` — rank correlation ``ρ``. ``'kendall'`` —
+        rank correlation ``τ``. The rank methods report the coefficient only (no ``r²``,
+        no line — a straight line isn't their model). Matches pandas' ``DataFrame.corr``.
+    line:
+        Draw the OLS fit line. Default ``True``. Only applies to ``method="pearson"``
+        (a no-op for the rank methods). Set ``False`` to suppress it and, e.g., compose
+        your own line from the returned/recorded slope and intercept.
+    position:
+        Corner preset (an ``add_text`` position, e.g. ``'topLeft'``) for the readout.
+        Default ``'topLeft'``. ``None`` computes the result for the report/metadata but
+        draws no label.
+    label:
+        Override string for the corner readout. ``None`` builds it from the parts below.
+    coefficient:
+        Pearson only — which statistic the readout shows: ``'r'`` (default), ``'r2'``
+        (just ``r²``, Excel-trendline style), or ``'both'``. Ignored for the rank kinds
+        (they always show ``ρ``/``τ``).
+    includePvalue:
+        Append the p-value to the readout. Default ``False``.
+    includeEquation:
+        Pearson only — append the fit equation ``, y = 0.84x + 0.27``. Default ``False``.
+    verbose:
+        Shortcut for the fullest readout: ``True`` is equivalent to
+        ``coefficient="both", includePvalue=True, includeEquation=True`` (and overrides
+        those three). Default ``False``. So the default readout is just ``r = 0.87``
+        (Pearson) / ``ρ = 0.81`` (rank); ``verbose=True`` gives
+        ``r = 0.87, r² = 0.76, P < 0.001, y = 0.84x + 0.27``.
+    offsetX, offsetY:
+        Pixel nudges for the readout, forwarded to ``add_text``.
+    fontSize:
+        Font size of the readout. Defaults to the theme's ``secondaryFontSize``
+        (``fontSize - 1``, i.e. ``6`` at the default ``fontSize=7``).
+    decimals, notation:
+        Control the p-value format in the readout, as in ``add_comparisons``.
+    color, strokeWidth, strokeDash, opacity:
+        Curated style overrides for the fit line (same four knobs as ``add_rule``). Each
+        defaults to ``None`` → the line inherits the theme's ``mark_line`` config; set one
+        to override just that property.
+    lineStyle:
+        A dict of raw ``mark_line`` properties merged in last, so any Vega-Lite line
+        property is reachable (e.g. ``{"interpolate": "monotone", "strokeCap": "round"}``).
+        Keys here **override** the curated ``color``/``strokeWidth``/etc. above.
+    report:
+        ``True`` prints the report (coefficient, r², p, fit, n) to stdout. Default
+        ``False``. The record is queued for export metadata regardless.
+    save:
+        ``True`` writes the report to ``dysonsphere_report_<timestamp>.txt`` in the cwd;
+        a string writes it to that directory.
+
+    Examples
+    --------
+    ::
+
+        scatter = alt.Chart(df).mark_point().encode(x="height:Q", y="weight:Q")
+        scatter + ds.add_correlation(df, "height", "weight")                 # r + r² + OLS line
+        scatter + ds.add_correlation(df, "height", "weight", method="spearman")  # ρ, no line
+        scatter + ds.add_correlation(
+            df, "height", "weight",
+            color="#c0392b", lineStyle={"strokeDash": [4, 2]},
+        )
+    """
+    from datetime import datetime
+    from pathlib import Path
+
+    from .statistics import _make_correlation_record, _push_report, _render_report, _run_correlation
+    from .utils import ensure_polars
+
+    if verbose:  # shortcut for the fullest readout; overrides the individual toggles
+        coefficient, includePvalue, includeEquation = "both", True, True
+    if coefficient not in ("r", "r2", "both"):
+        raise ValueError(f"coefficient must be 'r', 'r2', or 'both', got {coefficient!r}")
+
+    df = ensure_polars(df)
+    x = df[xCol].cast(pl.Float64).to_numpy()
+    y = df[yCol].cast(pl.Float64).to_numpy()
+    result = _run_correlation(method, x, y)
+
+    layers: list = []
+
+    # OLS fit line — Pearson only (result["slope"] is None for rank kinds).
+    if line and result["slope"] is not None:
+        x0, x1 = float(x.min()), float(x.max())
+        slope, intercept = result["slope"], result["intercept"]
+        fit_df = pl.DataFrame({"_x": [x0, x1], "_y": [slope * x0 + intercept, slope * x1 + intercept]})
+        # By default the line inherits the theme's mark_line config (no overrides).
+        # Curated params override only what's passed; lineStyle overrides everything.
+        mark_kwargs: dict = {}
+        if color is not None:
+            mark_kwargs["color"] = color
+        if strokeWidth is not None:
+            mark_kwargs["strokeWidth"] = strokeWidth
+        if strokeDash is False:
+            mark_kwargs["strokeDash"] = [0, 0]
+        elif strokeDash is True:
+            mark_kwargs["strokeDash"] = alt.theme.options.get("dashedWidth", [2, 2])
+        elif isinstance(strokeDash, list):
+            mark_kwargs["strokeDash"] = strokeDash
+        if opacity is not None:
+            mark_kwargs["opacity"] = opacity
+        if lineStyle:
+            mark_kwargs.update(lineStyle)
+        # Plain x:Q/y:Q with no title/axis override: the fit line shares the main chart's
+        # scale, and because the base chart is the first layer, its axis (titles, ticks)
+        # wins the shared-axis resolution.  (Setting title=None nulls the base title;
+        # axis=None suppresses the axis entirely — both wrong here.)
+        layers.append(alt.Chart(fit_df).mark_line(**mark_kwargs).encode(x=alt.X("_x:Q"), y=alt.Y("_y:Q")))
+
+    # Corner readout.
+    if position is not None:
+        text = (
+            label
+            if label is not None
+            else _correlation_label(
+                result,
+                coefficient=coefficient,
+                includePvalue=includePvalue,
+                includeEquation=includeEquation,
+                decimals=decimals,
+                notation=notation,
+            )
+        )
+        layers.append(
+            add_text(
+                text,
+                position=position,
+                offsetX=offsetX,
+                offsetY=offsetY,
+                fontSize=fontSize if fontSize is not None else alt.theme.options.get("fontSize", 7),
+            )
+        )
+
+    # Structured record → export metadata; printed/written on request.
+    record = _make_correlation_record(result, xCol, yCol)
+    _push_report(record)
+    if report or save:
+        report_text = _render_report(record)
+        if report:
+            print(report_text)
+        if save:
+            directory = Path(save) if isinstance(save, str) else Path.cwd()
+            directory.mkdir(parents=True, exist_ok=True)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            (directory / f"dysonsphere_report_{ts}.txt").write_text(report_text + "\n", encoding="utf-8")
+
+    if not layers:
+        layers.append(alt.Chart(alt.Data(values=[{}])).mark_point(opacity=0))
+    return cast(alt.LayerChart, alt.layer(*layers))

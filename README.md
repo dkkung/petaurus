@@ -74,6 +74,7 @@ ds.save(chart, "plots/myplot")
     - [Violin](#violin)
   - [Statistical annotations](#statistical-annotations)
     - [Adding p-value annotations](#adding-p-value-annotations)
+    - [Correlation](#correlation)
   - [Multilabels](#multilabels)
     - [Sample sizes](#sample-sizes)
     - [Category labels](#category-labels)
@@ -123,7 +124,9 @@ ds.theme(   # custom configuration
 | `dashedRule` | `True` | Render rule marks dashed |
 | `dashedWidth` | `[2, 2]` | Dash/gap pattern `[dash, gap]` in pixels |
 | `font` | `"HelveticaNeue"` | Font family for all labels and titles |
-| `fontSize` | `7` | Font size in points |
+| `fontSize` | `7` | Font size in points (titles, axis labels — the primary tier) |
+| `secondaryFontSize` | `fontSize - 1` | An auxiliary smaller font size, auto-derived from `fontSize` (never below `smallestFontSize`, unless you set `fontSize` below it) unless set explicitly. Available for your own annotations; not consumed by the built-in defaults |
+| `smallestFontSize` | `5` | A fixed small font size (points) that also floors `secondaryFontSize`. Accepts an `int` or a `bool`: `True` minimizes the plot by setting `fontSize` to it; an `int` overrides the value; `False` / omitted leaves it simply retrievable. To go below it, pass a smaller `fontSize` directly |
 | `fontWeight` | `400` | Font weight: 300 = light, 400 = normal, 700 = bold |
 | `grid` | `False` | Show axis grid lines |
 | `gridColor` | `colors["greys"][0]` | Grid line color |
@@ -135,7 +138,12 @@ ds.theme(   # custom configuration
 | `markSize` | `min(chartWidth, chartHeight) * 0.1` | Mark size; for points, this is area in px<sup>2</sup> |
 | `markStroke` | `"black"` | Default stroke color for marks |
 | `markStrokeOpacity` | `1` | Default mark stroke opacity |
-| `palette` | `None` | Default color scheme applied to category, diverging, heatmap, and ramp scales. Accepts a key from `colors` or a raw list |
+| `palette` | `None` | **Master** color scheme applied to *all* scale types (category, diverging, heatmap, ordinal, ramp). Accepts a key from `colors`, a custom palette name, a raw hex list, or a Vega scheme name. When set, it overrides the per-type keys below |
+| `categoryPalette` | `None` | Override the scheme for **categorical** scales only. Same accepted values as `palette`. Ignored when `palette` is set |
+| `divergingPalette` | `None` | Override the scheme for **diverging** scales only |
+| `heatmapPalette` | `None` | Override the scheme for **heatmap** scales only |
+| `ordinalPalette` | `None` | Override the scheme for **ordinal** scales only |
+| `rampPalette` | `None` | Override the scheme for **ramp** (continuous) scales only |
 | `strokeCap` | `"round"` | Stroke end cap: `"butt"`, `"round"`, or `"square"` |
 | `ticks` | `True` | Show axis ticks |
 | `tickSize` | `3` | Tick length in pixels |
@@ -270,15 +278,30 @@ ds.palette("blues", n=4, reverse=True)  # reversed
 
 When no explicit `scale=` is set on a color encoding, Vega-Lite falls back to the theme's range defaults:
 
-| Range type | Default palette | Used for |
-|---|---|---|
-| `category` | `blues` (even indices: 0, 2, 4, 6, 8, 10) | Nominal/unordered groups |
-| `ordinal` | `blues` | Ordered discrete values |
-| `ramp` | `blues` | Sequential continuous (legend ramps) |
-| `heatmap` | `blues` | Rect/heatmap marks |
-| `diverging` | `redsblues` | Diverging scales |
+| Range type | Default palette | Override with | Used for |
+|---|---|---|---|
+| `category` | `blues` (even indices: 0, 2, 4, 6, 8, 10) | `categoryPalette` | Nominal/unordered groups |
+| `ordinal` | `blues` | `ordinalPalette` | Ordered discrete values |
+| `ramp` | `blues` | `rampPalette` | Sequential continuous (legend ramps) |
+| `heatmap` | `blues` | `heatmapPalette` | Rect/heatmap marks |
+| `diverging` | `redsblues` | `divergingPalette` | Diverging scales |
 
-Setting `ds.theme(palette="mypalette")` overrides all five types simultaneously.
+Setting `ds.theme(palette="mypalette")` overrides all five types simultaneously. To override an individual type, set its **Override with** key from the table above — each accepts a palette name, a custom palette, a raw hex list, or a Vega scheme name:
+
+```python
+ds.theme(divergingPalette="redsblues2", heatmapPalette="greens")   # only those two types change
+```
+
+Or in `dysonsphere.toml`:
+
+```toml
+[default]
+divergingPalette = "redsblues2"
+
+[my_style]
+categoryPalette = "reds2"
+heatmapPalette  = ["#ffffff", "#000000"]
+```
 
 > **Note:** The gallery and examples in this README use `palette="blues2"` rather than the shipped default `blues`. `blues2` is a more saturated variant of `blues`.
 
@@ -360,30 +383,34 @@ Calling `chart.save()` directly skips all of the above and will produce misalign
 ```python
 ds.save(chart, "myplot", ppi=1200)                 # default PPI; reduce for faster exports
 ds.save(chart, "myplot", saveVegaSpec=False)       # skip the JSON spec
-ds.save(chart, "myplot", description="Figure 1")   # embed a description in SVG <desc>, PNG iTXt chunk, and Vega-Lite spec
-ds.save(chart, "myplot", saveMetadata=False)       # suppress generation metadata
+ds.save(chart, "myplot", description="Figure 1")   # your own description, in SVG <desc>, PNG iTXt, and the JSON spec
+ds.save(chart, "myplot", saveMetadata=False)       # suppress the structured metadata block
 ds.save(chart, "myplot", background=["light"])     # light variant only
 ds.save(chart, "myplot", background=["dark"])      # dark variant only
 ```
 
 #### Metadata
 
-By default, `ds.save()` embeds a generation info string in the SVG `<desc>` element, the PNG `iTXt Description` chunk, and the Vega-Lite JSON spec. This records exactly what generated the file — useful for tracking down which script produced a plot and under which environment.
+By default, `ds.save()` embeds a machine-readable JSON block — `{"provenance": {...}, "statistics": [...]}` — in **all three** outputs, so each file is self-contained and records exactly what produced it:
 
-```
-Generated with analysis.py by username using Python vX.Y.Z on YYYYMMDD at HH:MM:SS UTC using altair vX.Y.Z / dysonsphere vX.Y.Z.
-```
+- **Vega-Lite JSON** — under `usermeta.dysonsphere` (merged into any `usermeta` you set yourself).
+- **SVG** — in a `<metadata id="dysonsphere">` element (CDATA).
+- **PNG** — in an `iTXt dysonsphere` chunk (read with e.g. `exiftool myplot_light.png`).
 
-When running in a Jupyter notebook the script name is replaced with `<jupyter-notebook>`. If the OS does not expose a username it falls back to `unknown_user`. The same string is written to all three outputs — you can inspect it with any SVG editor or text editor, by reading `myplot_vegalite.json`, or with a tool like `exiftool myplot_light.png`.
+The block has two keys:
 
-Pass `description=` to prepend your own label; the metadata info follows on a new line:
+- `provenance` — the generation facts as structured fields: `user`, `script`, `timestamp` (ISO-8601), `python`, `altair`, `dysonsphere`. (In a Jupyter notebook `script` is `<jupyter-notebook>`; if the OS exposes no username, `user` is `unknown_user`.)
+- `statistics` — the structured records from any [`add_comparisons()`](#adding-p-value-annotations) calls (per-group descriptives, the omnibus result, the comparison test + correction method, and every comparison with exact p-values and effect sizes). Read it back with `json.load(open("myplot_vegalite.json"))["usermeta"]["dysonsphere"]["statistics"]` — no text parsing, and trivial to turn into CSV/TSV.
+
+These facts are stored **only** as structured JSON — dysonsphere doesn't also write a prose "Generated by…" string (that would bloat the files and duplicate the block). For a human-readable statistics report, use `ds.add_comparisons(..., report=True)` (prints to stdout) or `save="dir"` (writes a `.txt`).
+
+The `description=` field is entirely yours: whatever you pass is stored verbatim (nothing appended) in the SVG `<desc>`, the PNG `Description` chunk, and the JSON `description` key — so it stays a clean chart label / aria-label.
 
 ```python
-ds.save(chart, "myplot", description="Figure 1")
-# description field: "Figure 1\nGenerated with analysis.py by username using Python ..."
+ds.save(chart, "myplot", description="Figure 1")   # description field: "Figure 1"
 ```
 
-Pass `saveMetadata=False` to suppress the metadata description entirely.
+Pass `saveMetadata=False` to suppress the structured block; your `description` (if any) is still written.
 
 ---
 
@@ -499,20 +526,22 @@ ds.save(alt.hconcat(left, right), "comparison")
 
 ### Statistical annotations
 
-#### Adding p-value annotations
+`add_comparisons()` annotates group comparisons. It has two modes, selected by `test`:
 
-`add_pvalue()` annotates group comparisons. It has two modes, selected by `test`:
+- **Pairwise** (`"mannwhitneyu"`, `"ttest_ind"`, `"ttest_rel"`, `"wilcoxon"`, `"tukey_hsd"`) - draws a bracket per pair in `pairs`, stacked automatically so they don't overlap.
+- **Omnibus** (`"anova"`, `"kruskal"`, `"friedman"`, `"alexandergovern"`) - places the omnibus result as a corner label (via `add_text`), and, if `pairs` is given, fills the brackets with a post-hoc test.
 
-- **Pairwise** (`"mannwhitneyu"`, `"ttest_ind"`, `"ttest_rel"`, `"wilcoxon"`, `"tukey_hsd"`) — draws a bracket per pair in `pairs`, stacked automatically so they don't overlap.
-- **Omnibus** ("are *any* groups different?": `"anova"`, `"kruskal"`, `"friedman"`, `"alexandergovern"`) — places the omnibus result as a corner label (via `add_text`), and, if `pairs` is given, fills the brackets with a post-hoc test.
+> **Renamed in v1.1:** this function was `add_pvalue()` in v1.0. `add_pvalue()` still works as a deprecated alias (it emits a `DeprecationWarning`) and will be removed in v2.0 - switch to `add_comparisons()`.
 
 Combine with any chart using `+`.
+
+#### Pairwise tests
 
 ```python
 CATEGORIES = ["Group A", "Group B", "Group C"]
 
 # single comparison
-chart + ds.add_pvalue(
+chart + ds.add_comparisons(
     df,
     "group",
     "value",
@@ -521,7 +550,7 @@ chart + ds.add_pvalue(
 )
 
 # multiple comparisons — brackets stacked automatically
-chart + ds.add_pvalue(
+chart + ds.add_comparisons(
     df,
     "group",
     "value",
@@ -530,38 +559,16 @@ chart + ds.add_pvalue(
 )
 ```
 
-Omnibus ANOVA in the corner + Tukey post-hoc brackets (`omnibusVerbose` adds the statistic, df, and effect size to the label):
-
-```python
-chart + ds.add_pvalue(
-    df,
-    "group",
-    "value",
-    pairs=[("Group A", "Group C"), ("Group B", "Group C")],
-    test="anova",                # corner: "ANOVA F(2, 57) = 6.34, P = 0.003, η² = 0.18"
-    omnibusVerbose=True,
-    omnibusPosition="topLeft",
-    categories=CATEGORIES,        # post-hoc defaults to Tukey HSD
-)
-
-# omnibus-only (no brackets), print the full descriptive + effect-size report
-chart + ds.add_pvalue(df, "group", "value", test="kruskal", categories=CATEGORIES, report=True)
-```
-
-![p-value omnibus example](https://raw.githubusercontent.com/dkkung/dysonsphere/main/docs/pvalue_omnibus_example_light.png)
-
-The supported post-hocs are Tukey HSD and Dunnett (via scipy) plus **Dunn, Nemenyi, and Games-Howell**, which dysonsphere computes in-house (validated against `scikit-posthocs` and `pingouin`) so no heavy extra dependency is needed. Every `add_pvalue()` call also generates a descriptive + effect-size report that is appended to the metadata of files written by `ds.save()` (see `report`/`save`). For an omnibus test the report lists **all** pairwise post-hoc comparisons (the full table), not just the pairs you draw brackets for.
-
 From pre-computed p-values, with explicit bracket positions:
 
 ```python
-ds.add_pvalue(..., pvalues=[0.002, 0.031], yPositions=[4.5, 5.2])
+ds.add_comparisons(..., pvalues=[0.002, 0.031], yPositions=[4.5, 5.2])
 ```
 
-Brackets below the marks using `reverse` — requires negative `yStep` so levels stack downward, and an explicit `tickHeight` (positive) since auto-compute would produce a negative value:
+Brackets below the marks using `reverse` - requires negative `yStep` so levels stack downward, and an explicit `tickHeight` (positive) since auto-compute would produce a negative value:
 
 ```python
-ds.add_pvalue(
+ds.add_comparisons(
     df,
     "group",
     "value",
@@ -574,7 +581,31 @@ ds.add_pvalue(
     reverse=[("A", "B")],
 )
 ```
-![p-value example](https://raw.githubusercontent.com/dkkung/dysonsphere/main/docs/pvalue_example_light.png)
+![p-value example](https://raw.githubusercontent.com/dkkung/dysonsphere/main/docs/pairwise_example_light.png)
+
+#### Omnibus tests
+
+Omnibus ANOVA in the corner + Tukey post-hoc brackets (`omnibusVerbose=True` adds the statistic, df, and effect size to the label):
+
+```python
+chart + ds.add_comparisons(
+    df,
+    "group",
+    "value",
+    pairs=[("Group A", "Group C"), ("Group B", "Group C")],
+    test="anova",                # corner: "ANOVA F(2, 57) = 6.34, P = 0.003, η² = 0.18"
+    omnibusVerbose=True,
+    testLabelPosition="topLeft",
+    categories=CATEGORIES,        # post-hoc defaults to Tukey HSD
+)
+
+# omnibus-only (no brackets), print the full descriptive + effect-size report
+chart + ds.add_comparisons(df, "group", "value", test="kruskal", categories=CATEGORIES, report=True)
+```
+
+The supported post-hocs are Tukey HSD and Dunnett (via `scipy`) plus **Dunn, Nemenyi, and Games-Howell**, which `dysonsphere` computes *in-house* (validated against `scikit-posthocs` and `pingouin`). Every `add_comparisons()` call also generates a descriptive + effect-size report that is appended to the metadata of files written by `ds.save()` (see `report`/`save`). For an omnibus test the report lists **all** pairwise post-hoc comparisons (the full table), not just the pairs you draw brackets for. Report p-values carry the **real computed value at 3 significant figures** (e.g. `P = 1.22e-11`) — never the floored `P < 0.001` used for on-plot labels — so the metadata stays precise down to the float limit, independent of the label's `notation`/`decimals`.
+
+![p-value omnibus example](https://raw.githubusercontent.com/dkkung/dysonsphere/main/docs/omnibus_example_light.png)
 
 | Parameter | Default | Description |
 |---|---|---|
@@ -590,21 +621,88 @@ ds.add_pvalue(
 | `yStart` | auto | Y position of the lowest bracket |
 | `yStep` | `yPad * 2` | Vertical distance between stacking levels |
 | `yPad` | auto | Padding above data max when `yStart` is auto-placed. Defaults to a fixed ~8 px visual gap (`bracketStyle="line"`) or ~10 px (`bracketStyle="bracket"`), scaled to data units via `chartHeight` |
-| `bracketStyle` | `"line"` | `"line"` (bar only) or `"bracket"` (bar + end ticks) |
-| `labelStyle` | `"p"` | `"p"` renders `P = 0.012` / `P < 0.001`; `"asterisks"` renders `*` / `**` / `***` / `ns` |
-| `tickHeight` | `yStep * 0.25` | End tick height in data units (only for `bracketStyle="bracket"`) |
+| `bracketStyle` | `"bracket"` | `"bracket"` (bar + end ticks) or `"line"` (bar only) |
+| `labelStyle` | `"p"` | `"p"` renders `P = 0.012` / `P < 0.001`; `"asterisks"` renders `*` / `**` / `***` / `ns` (brackets only — the omnibus label always shows the p-value) |
+| `tickHeight` | `tickSize` | End tick height, defaulting to the theme's `tickSize` (px → data units) so bracket ticks match the axis ticks. Only for `bracketStyle="bracket"` |
 | `reverse` | `None` | List of `(group1, group2)` tuples identifying brackets to flip below the bar |
 | `categories` | inferred | Ordered list of all x-axis categories |
 | `chartWidth` | `theme(chartWidth)` | Chart width for computing text x position; auto-read from the active theme, rarely needs to be set explicitly |
-| `fontSize` | `6` | Font size of p-value labels |
+| `fontSize` | `theme(fontSize)` | Font size of the p-value / corner labels; defaults to the theme's `fontSize` |
 | `decimals` | `3` | Decimal places in the p-value label when `labelStyle="p"`. Also sets the display threshold: values below `10^(-decimals)` show as `P < 0.001`. For `notation="scientific"` or `"e"`, controls mantissa decimal places. Ignored for `notation="power"` |
 | `notation` | `None` | Number format for `labelStyle="p"`. `None` uses `P = 0.012` / `P < 0.001` style. `"scientific"` → `P = 1.23×10⁻⁵`. `"e"` → `P = 1.23e-05`. `"power"` → `P ≈ 10⁻⁵` (rounds to nearest power of 10 — values within the same order of magnitude get the same label, so best for widely spread p-values). `"si"` raises `ValueError` |
-| `omnibusPosition` | `"topLeft"` | Corner preset (an `add_text` position) for the omnibus label. `None` computes the result for the report but draws no label |
-| `omnibusLabel` | `None` | Override string for the omnibus corner label |
-| `omnibusVerbose` | `False` | `False` → `ANOVA P = 0.003`; `True` → `ANOVA F(2, 57) = 6.34, P = 0.003, η² = 0.18` |
-| `omnibusOffsetX`, `omnibusOffsetY` | `0` | Pixel nudges for the omnibus label |
+| `testLabelPosition` | `"auto"` | Corner preset for the single **test label**, whose content adapts: the omnibus **result** (`ANOVA P = 0.003`) for omnibus tests, or the pairwise **test name** (`Mann-Whitney U`) for pairwise tests. `"auto"` shows it at `"topLeft"` for omnibus and hides it for pairwise (opt-in); a preset draws it there; `None` hides it (result still computed for the report/metadata) |
+| `testLabel` | `None` | Override string for the test label |
+| `omnibusVerbose` | `False` | Omnibus label content: `False` → `ANOVA P = 0.003`; `True` → `ANOVA F(2, 57) = 6.34, P = 0.003, η² = 0.18` |
+| `testLabelOffsetX`, `testLabelOffsetY` | `0` | Pixel nudges for the test label |
+| `testLabelX`, `testLabelY` | `None` | Explicit coordinates for the test label (data values, category names, or `alt.value(px)`), overriding the preset |
 | `report` | `False` | `True` prints the full descriptive + effect-size report to stdout. The report is queued for `ds.save()` metadata regardless |
 | `save` | `False` | `True` writes the report to `dysonsphere_report_<timestamp>.txt` in the cwd; a string writes to that directory |
+
+#### Correlation
+
+`add_correlation()` annotates a **scatter** (two continuous variables) with a correlation coefficient, and — for `method="pearson"` only — draws the OLS regression line. `method` matches pandas' `DataFrame.corr` (`"pearson"` / `"spearman"` / `"kendall"`). Like `add_comparisons()`, it reports its result as a corner label and queues a structured record for `ds.save()` metadata. Compose it with `+`.
+
+```python
+import altair as alt
+import numpy as np
+import polars as pl
+import dysonsphere as ds
+
+ds.theme()
+
+rng = np.random.default_rng(0)
+x = rng.uniform(0, 10, 100)
+df = pl.DataFrame({"height": x, "weight": 0.9 * x + rng.normal(0, 1, 100)})
+
+scatter = alt.Chart(df).mark_point().encode(x="height:Q", y="weight:Q")
+
+# Pearson: draws the OLS fit line; the readout is just "r = 0.90" by default
+chart = scatter + ds.add_correlation(df, "height", "weight")
+ds.save(chart, "plots/correlation")
+
+# other options
+scatter + ds.add_correlation(df, "height", "weight", method="spearman")            # ρ, no line
+scatter + ds.add_correlation(df, "height", "weight", includePvalue=True)           # r = 0.90, P < 0.001
+scatter + ds.add_correlation(df, "height", "weight", coefficient="both")           # r + r²
+scatter + ds.add_correlation(df, "height", "weight", verbose=True)                 # r, r², P, and the equation
+scatter + ds.add_correlation(
+    df, "height", "weight",
+    color="#c0392b", strokeWidth=1.2,                                              # curated line style
+    lineStyle={"strokeDash": [4, 2]},                                              # raw mark_line passthrough
+)
+```
+
+![correlation example](https://raw.githubusercontent.com/dkkung/dysonsphere/main/docs/correlation_example_light.png)
+
+The three `method`s report different coefficients; only Pearson has a straight-line model, so `line=` is a no-op for the rank methods:
+
+| `method` | coefficient | line |
+|---|---|---|
+| `"pearson"` *(default)* | `r` (and `r²`, slope/intercept) | OLS line |
+| `"spearman"` | `ρ` | none |
+| `"kendall"` | `τ` | none |
+
+The readout is composed from independent parts — by default it shows just the coefficient (`r = 0.90` / `ρ = 0.81`); switch on more with the parameters below. `verbose=True` is the shortcut for the fullest readout.
+
+| Parameter | Default | Description |
+|---|---|---|
+| `df` | required | Polars or pandas DataFrame |
+| `xCol`, `yCol` | required | Column names for the two continuous variables |
+| `method` | `"pearson"` | `"pearson"`, `"spearman"`, or `"kendall"` (matches pandas' `DataFrame.corr`) |
+| `line` | `True` | Draw the OLS fit line (Pearson only; no-op for rank methods). `False` to suppress and, e.g., compose your own from the recorded slope/intercept |
+| `position` | `"topLeft"` | Corner preset (an `add_text` position) for the readout. `None` computes the result for the metadata but draws no label |
+| `label` | `None` | Override string for the corner readout |
+| `coefficient` | `"r"` | Pearson only — `"r"`, `"r2"` (just r², Excel-trendline style), or `"both"`. Ignored for rank methods |
+| `includePvalue` | `False` | Append the p-value to the readout |
+| `includeEquation` | `False` | Pearson only — append the fit equation `, y = 0.84x + 0.27` |
+| `verbose` | `False` | Shortcut: `True` = `coefficient="both", includePvalue=True, includeEquation=True` (overrides those three) |
+| `offsetX`, `offsetY` | `0` | Pixel nudges for the readout |
+| `fontSize` | `theme(fontSize)` | Font size of the readout; defaults to the theme's `fontSize` |
+| `decimals`, `notation` | `3`, `None` | Control the p-value format in the readout (as in `add_comparisons`) |
+| `color`, `strokeWidth`, `strokeDash`, `opacity` | `None` (inherit) | Curated style overrides for the fit line (the same four knobs as `add_rule`). Each defaults to `None`, so the line inherits the theme's `mark_line` config; set one to override just that property |
+| `lineStyle` | `None` | A dict of raw `mark_line` properties merged in last, so any Vega-Lite line property is reachable. Keys here **override** the curated `color`/`strokeWidth`/etc. above |
+| `report` | `False` | `True` prints the report (coefficient, r², P, fit, n) to stdout; queued for `ds.save()` metadata regardless |
+| `save` | `False` | `True` writes the report to a `.txt` in the cwd; a string writes to that directory |
 
 ### Multilabels
 

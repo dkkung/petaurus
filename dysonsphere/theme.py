@@ -43,6 +43,8 @@ _BUILTIN_DEFAULTS: dict[str, Any] = {
     "dashedWidth": [2, 2],
     "font": "HelveticaNeue",
     "fontSize": 7,
+    "secondaryFontSize": None,
+    "smallestFontSize": 5,
     "fontStyle": "normal",
     "fontWeight": 400,
     "grid": False,
@@ -59,6 +61,11 @@ _BUILTIN_DEFAULTS: dict[str, Any] = {
     "markStrokeOpacity": 1,
     "markStrokeWidth": None,
     "palette": None,
+    "categoryPalette": None,
+    "divergingPalette": None,
+    "heatmapPalette": None,
+    "ordinalPalette": None,
+    "rampPalette": None,
     "strokeCap": "round",
     "ticks": True,
     "tickSize": 3,
@@ -203,9 +210,25 @@ def theme(style: str | None = None, **kwargs: Any) -> None:
         p["cornerRadius"] = min(p["chartWidth"], p["chartHeight"]) / 100
     if p["chartFill"] is None and not p["darkmode"]:
         p["chartFill"] = "white"
+    # smallestFontSize is a fixed floor (5) and a minimize switch: True drops the whole
+    # plot's base font to it; False / an int just leaves it retrievable.
+    if p["smallestFontSize"] is True:
+        p["smallestFontSize"] = 5
+        p["fontSize"] = p["smallestFontSize"]
+    elif p["smallestFontSize"] is False:
+        p["smallestFontSize"] = 5
+    if p["secondaryFontSize"] is None:
+        p["secondaryFontSize"] = max(1, p["fontSize"] - 1)  # smaller tier for in-plot annotations
+        if p["fontSize"] >= p["smallestFontSize"]:  # don't let the tier dip below the floor …
+            p["secondaryFontSize"] = max(p["secondaryFontSize"], p["smallestFontSize"])
+        # … unless the user explicitly set fontSize below the floor (escape hatch)
 
-    palette = p["palette"]
-    p["palette"] = colors[palette] if palette is not None and palette in colors else palette
+    # Resolve every palette-valued key: a name in `colors` (built-in or custom)
+    # becomes its hex list; anything else (a raw list, or a Vega scheme name) is
+    # passed through unchanged.
+    for key in ("palette", "categoryPalette", "divergingPalette", "heatmapPalette", "ordinalPalette", "rampPalette"):
+        val = p[key]
+        p[key] = colors[val] if isinstance(val, str) and val in colors else val
 
     alt.theme.options = {**p, "tickWidth": p["axisWidth"]}
 
@@ -213,6 +236,15 @@ def theme(style: str | None = None, **kwargs: Any) -> None:
 @alt.theme.register("dysonsphere", enable=True)
 def _dysonsphere_theme() -> dict[str, Any]:
     opts = alt.theme.options
+
+    def _scheme(type_key: str, default: Any) -> Any:
+        # Precedence: global `palette` (master override) → per-type `<type>Palette` → default.
+        if opts.get("palette") is not None:
+            return opts["palette"]
+        if opts.get(type_key) is not None:
+            return opts[type_key]
+        return default
+
     return {
         "background": (None if opts["transparentBackground"] else opts["chartFill"]),  # background of the entire chart
         "config": {
@@ -444,11 +476,11 @@ def _dysonsphere_theme() -> dict[str, Any]:
                 "strokeWidth": opts["markStrokeWidth"],
             },
             "range": {
-                "category": {"scheme": opts["palette"] if opts.get("palette") is not None else colors["blues"][::2]},
-                "diverging": {"scheme": opts["palette"] if opts.get("palette") is not None else colors["redsblues"]},
-                "heatmap": {"scheme": opts["palette"] if opts.get("palette") is not None else colors["blues"]},
-                "ordinal": {"scheme": opts["palette"] if opts.get("palette") is not None else colors["blues"]},
-                "ramp": {"scheme": opts["palette"] if opts.get("palette") is not None else colors["blues"]},
+                "category": {"scheme": _scheme("categoryPalette", colors["blues"][::2])},
+                "diverging": {"scheme": _scheme("divergingPalette", colors["redsblues"])},
+                "heatmap": {"scheme": _scheme("heatmapPalette", colors["blues"])},
+                "ordinal": {"scheme": _scheme("ordinalPalette", colors["blues"])},
+                "ramp": {"scheme": _scheme("rampPalette", colors["blues"])},
             },
             "rule": {
                 "color": "white" if opts["darkmode"] else "black",
@@ -551,7 +583,7 @@ def create_config(directory: str | Path | None = None, *, persist: bool = False)
         "",
         "# [default] applies to every ds.theme() call regardless of style.",
         "# Leave it empty or omit to use dysonsphere's built-in defaults unchanged,",
-        "# or add keys to override the defaults.",
+        "# or add keys to override the defaults, such as default palettes for range types.",
         "",
         "[default]",
         "",
