@@ -11,8 +11,12 @@ import sys
 import zlib
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import altair as alt
+
+if TYPE_CHECKING:
+    import polars as pl
 
 _REPORT_PREFIX = "dysonsphere-report-"
 
@@ -275,8 +279,42 @@ def _read_dysonsphere_block(path: str) -> dict:
     return block
 
 
-def read(path: str, *, what: str = "report", save: bool | str = False) -> "str | list | dict":
-    """Read back the metadata embedded by :func:`save` from a PNG, SVG, or Vega-Lite JSON.
+def _read_data(path: str) -> "pl.DataFrame":
+    """Rebuild the primary DataFrame from a Vega-Lite JSON (the ``.json`` spec).
+
+    Altair inlines the whole ``alt.Chart(df)`` frame — **every column, even unused ones** —
+    as a named dataset (or inline ``data.values``).  We return the *largest* embedded
+    row-list as a Polars DataFrame; smaller ones are typically annotation-layer data.  Dtypes
+    are re-inferred from JSON, so a category/datetime column comes back as string/number.
+    """
+    import polars as pl
+
+    p = Path(path)
+    if p.suffix.lower() != ".json":
+        raise ValueError(f"what='data' needs the Vega-Lite JSON (the .json spec), got {p.suffix!r}")
+    spec = json.loads(p.read_text(encoding="utf-8"))
+    candidates: list[list] = [v for v in (spec.get("datasets") or {}).values() if isinstance(v, list)]
+
+    def walk(o):
+        if isinstance(o, dict):
+            data = o.get("data")
+            if isinstance(data, dict) and isinstance(data.get("values"), list):
+                candidates.append(data["values"])
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+
+    walk(spec)
+    rows = max(candidates, key=len, default=[])
+    if not rows:
+        raise ValueError(f"no embedded data found in {path!r} (was the DataFrame inlined at save time?)")
+    return pl.DataFrame(rows)
+
+
+def read(path: str, *, what: str = "report", save: bool | str = False) -> Any:  # str|list|dict|pl.DataFrame per `what`
+    """Read back the metadata (or data) embedded by :func:`save` from a PNG, SVG, or JSON.
 
     Parameters
     ----------
@@ -293,17 +331,22 @@ def read(path: str, *, what: str = "report", save: bool | str = False) -> "str |
         - ``'statistics'`` — the structured **records** (list of dicts, exact floats).
         - ``'metadata'`` — the whole ``{provenance, statistics, theme, report}`` dict, where
           ``report`` is the ``{section: text}`` container.
+        - ``'data'`` — the **original DataFrame** (Polars), rebuilt from the data Altair
+          inlined into the spec. **JSON only** (PNG/SVG don't carry the data). Returns the
+          whole frame Altair embedded, including columns the chart never plotted.
     save:
         Only for ``what='report'``: ``True`` writes the report to a ``.txt`` in the cwd;
         a string writes to that directory.
     """
+    if what == "data":
+        return _read_data(path)
     block = _read_dysonsphere_block(path)
     if what == "metadata":
         return block
     if what == "statistics":
         return block.get("statistics", [])
     if what != "report":
-        raise ValueError(f"what must be 'report', 'statistics', or 'metadata', got {what!r}")
+        raise ValueError(f"what must be 'report', 'statistics', 'metadata', or 'data', got {what!r}")
     report = block.get("report")  # {section: text} container
     if report:
         text = "\n\n".join(report.values())

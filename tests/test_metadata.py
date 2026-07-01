@@ -319,6 +319,24 @@ class TestReadLoad:
         with pytest.raises(ValueError, match="no dysonsphere metadata"):
             ds.read(str(tmp_path / "bare.json"))
 
+    def test_read_data_rebuilds_full_dataframe(self, tmp_path):
+        import dysonsphere as ds
+
+        # include a column the chart never plots — it must still round-trip
+        orig = pl.DataFrame({"g": ["A", "A", "B", "B"], "v": [1.0, 2.0, 3.0, 4.0], "extra": [10, 20, 30, 40]})
+        chart = alt.Chart(orig).mark_boxplot().encode(x="g:N", y="v:Q")
+        ds.save(chart, str(tmp_path / "d"), format="json", background=["light"])
+        got = ds.read(str(tmp_path / "d.json"), what="data")
+        assert isinstance(got, pl.DataFrame)
+        assert set(got.columns) == {"g", "v", "extra"}  # whole frame, not just plotted cols
+        assert got.sort(["g", "v"]).equals(orig.sort(["g", "v"]))
+
+    def test_read_data_json_only(self, saved):
+        import dysonsphere as ds
+
+        with pytest.raises(ValueError, match="needs the Vega-Lite JSON"):
+            ds.read(str(saved / "t.svg"), what="data")
+
     def test_read_report_save_writes_txt(self, saved, tmp_path):
         import dysonsphere as ds
 

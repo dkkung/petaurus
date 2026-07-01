@@ -410,13 +410,14 @@ None of this touches `description` — that stays your `description=` text only.
 `ds.read()` pulls the metadata back out of any exported PNG / SVG / JSON:
 
 ```python
-ds.read("myplot.png")                       # prints the report table, returns the text
-ds.read("myplot.png", save="reports")       # + writes reports/dysonsphere_report_<ts>.txt
-ds.read("myplot.png", what="statistics")    # the structured records (exact floats)
-ds.read("myplot.json", what="metadata")  # the whole {provenance, statistics, theme, report} dict
+ds.read("myplot.png")                     # prints the report table, returns the text
+ds.read("myplot.png", save="reports")     # + writes reports/dysonsphere_report_<ts>.txt
+ds.read("myplot.png", what="statistics")  # the structured records (exact floats)
+ds.read("myplot.json", what="metadata")   # the whole {provenance, statistics, theme, report} dict
+ds.read("myplot.json", what="data")       # the original DataFrame, rebuilt from the spec (JSON only)
 ```
 
-`what="report"` (default) even **re-renders the table from the records** if the prose wasn't embedded (`embedReport=False`), so it works on any dysonsphere-saved file.
+`what="report"` (default) even **re-renders the table from the records** if the prose wasn't embedded (`embedReport=False`), so it works on any dysonsphere-saved file. `what="data"` returns the **whole** DataFrame Altair inlined into the JSON — every column you passed to `alt.Chart(df)`, including ones the chart never plotted (so mind what you hand it), rebuilt as Polars with dtypes re-inferred from JSON.
 
 `ds.load()` rebuilds the chart from the **Vega-Lite JSON** (the `.json` spec):
 
