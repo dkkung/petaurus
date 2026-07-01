@@ -1042,7 +1042,7 @@ def add_comparisons(
     fontSize: int | None = None,
     reverse: list[tuple[str, str]] | None = None,
     decimals: int = 3,
-    notation: str | None = None,
+    notation: str | dict | None = None,
     testLabelPosition: str | None = "auto",
     testLabel: str | None = None,
     omnibusVerbose: bool = False,
@@ -1169,6 +1169,10 @@ def add_comparisons(
         rounds to the nearest power of 10 giving ``P ≈ 10⁻²`` — note that
         values within the same decade (e.g. 0.04 and 0.06) map to the same
         label; best for p-values spanning multiple orders of magnitude.
+        A single value applies to every label; or pass a ``dict`` for per-pair
+        notation, e.g. ``{("A", "B"): "scientific", "test": "power"}`` — tuple
+        keys are pairs (matched either order, unlisted → plain), and the special
+        ``"test"`` key sets the omnibus label's notation.
     testLabelPosition:
         Corner preset (an ``add_text`` position, e.g. ``'topLeft'``,
         ``'bottomRight'``) for the single test label. Its content adapts: the
@@ -1306,6 +1310,24 @@ def add_comparisons(
     # tukey_hsd carries its own correction; explicit p-values aren't corrected by us.
     effective_correction = None if (method is None or method == "tukey_hsd") else correction
 
+    # Resolve notation: a scalar applies everywhere; a dict is per-pair for the brackets
+    # (order-insensitive keys, unlisted → plain) plus an optional "test" string key for the
+    # test/omnibus label. Pair notations are read below in the bracket loop.
+    if isinstance(notation, dict):
+        _valid_notations = {None, "scientific", "e", "power"}
+        bad_vals = [v for v in notation.values() if v not in _valid_notations]
+        if bad_vals:
+            raise ValueError(f"notation dict values must be None/'scientific'/'e'/'power', got {bad_vals}")
+        bad_keys = [k for k in notation if isinstance(k, str) and k != "test"]
+        if bad_keys:
+            raise ValueError(f"notation dict string keys must be 'test', got {sorted(bad_keys)}")
+        _notation_map = {frozenset(k): v for k, v in notation.items() if not isinstance(k, str)}
+        test_notation = notation.get("test")
+        pair_notations = [_notation_map.get(frozenset(p)) for p in (pairs or [])]
+    else:
+        test_notation = notation
+        pair_notations = [notation] * len(pairs or [])
+
     # --- unified test label: the omnibus result, or the pairwise/post-hoc test name ---
     # Position "auto" (default) → shown for omnibus (topLeft), hidden for pairwise.
     resolved_pos = ("topLeft" if is_omnibus else None) if testLabelPosition == "auto" else testLabelPosition
@@ -1313,7 +1335,9 @@ def add_comparisons(
         if testLabel is not None:
             label_text = testLabel
         elif is_omnibus:
-            label_text = _omnibus_label(omnibus_result, verbose=omnibusVerbose, notation=notation, decimals=decimals)
+            label_text = _omnibus_label(
+                omnibus_result, verbose=omnibusVerbose, notation=test_notation, decimals=decimals
+            )
         else:
             label_text = _TEST_DISPLAY.get(test, test)
         annotation_layers.append(
@@ -1445,7 +1469,7 @@ def add_comparisons(
                     fontSize=fontSize,
                     reverse=(g1, g2) in reverse if reverse is not None else False,
                     decimals=decimals,
-                    notation=notation,
+                    notation=pair_notations[i],
                 )
             )
 

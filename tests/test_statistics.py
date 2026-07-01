@@ -400,6 +400,94 @@ class TestBracketStyleDict:
             self._run(tri_df, "squiggle")
 
 
+class TestNotationDict:
+    @pytest.fixture
+    def tri_df(self):
+        rng = np.random.default_rng(0)
+        return pl.DataFrame({"g": ["A"] * 12 + ["B"] * 12 + ["C"] * 12, "v": rng.normal(0, 1, 36)})
+
+    def _bracket_labels(self, layer):
+        """Map bracket bar (x, x2) → its label text (inline-data brackets)."""
+        labels = {}
+        for sub in layer.to_dict()["layer"]:
+            bar_x = None
+            texts = []
+            for s in sub.get("layer", []):
+                for v in (s.get("data") or {}).get("values", []) if isinstance(s.get("data"), dict) else []:
+                    if "x2" in v:
+                        bar_x = (v["x"], v["x2"])
+                    if "label" in v:
+                        texts.append(v["label"])
+            if bar_x and texts:
+                labels[bar_x] = texts[0]
+        return labels
+
+    def _test_label(self, layer):
+        d = layer.to_dict().get("datasets", {})
+        vals = [v[0].get("__text") for v in d.values() if v and "__text" in v[0]]
+        return vals[0] if vals else None
+
+    def test_scalar_applies_to_all(self, tri_df):
+        labels = self._bracket_labels(
+            add_comparisons(
+                tri_df,
+                "g",
+                "v",
+                [("A", "B"), ("A", "C")],
+                pvalues=[1e-5, 1e-8],
+                categories=MULTI,
+                notation="scientific",
+            )
+        )
+        assert all("×10" in v for v in labels.values())
+
+    def test_dict_per_pair(self, tri_df):
+        labels = self._bracket_labels(
+            add_comparisons(
+                tri_df,
+                "g",
+                "v",
+                [("A", "B"), ("A", "C")],
+                pvalues=[1e-5, 1e-8],
+                categories=MULTI,
+                notation={("A", "B"): "scientific", ("A", "C"): "power"},
+            )
+        )
+        assert "×10" in labels[("A", "B")] and "≈ 10" in labels[("A", "C")]
+
+    def test_dict_unlisted_pair_is_plain(self, tri_df):
+        labels = self._bracket_labels(
+            add_comparisons(
+                tri_df,
+                "g",
+                "v",
+                [("A", "B"), ("A", "C")],
+                pvalues=[0.012, 1e-8],
+                categories=MULTI,
+                notation={("A", "C"): "scientific"},
+            )
+        )
+        assert labels[("A", "B")] == "P = 0.012" and "×10" in labels[("A", "C")]
+
+    def test_test_key_sets_omnibus_notation(self, tri_df):
+        layer = add_comparisons(tri_df, "g", "v", categories=MULTI, test="anova", notation={"test": "e"})
+        assert "e-" in self._test_label(layer) or "e+" in self._test_label(layer)
+
+    def test_dict_without_test_key_omnibus_plain(self, tri_df):
+        layer = add_comparisons(tri_df, "g", "v", categories=MULTI, test="anova", notation={("A", "B"): "scientific"})
+        assert self._test_label(layer).startswith("ANOVA P = 0.")
+
+    def test_invalid_value_raises(self, tri_df):
+        with pytest.raises(ValueError, match="notation dict values"):
+            add_comparisons(
+                tri_df, "g", "v", [("A", "B")], pvalues=[0.01], categories=MULTI, notation={("A", "B"): "si"}
+            )
+
+    def test_invalid_string_key_raises(self, tri_df):
+        with pytest.raises(ValueError, match="notation dict string keys must be 'test'"):
+            add_comparisons(tri_df, "g", "v", [("A", "B")], pvalues=[0.01], categories=MULTI, notation={"omnibus": "e"})
+
+
 class TestCorrectionMetadata:
     @pytest.fixture
     def tri_df(self):
