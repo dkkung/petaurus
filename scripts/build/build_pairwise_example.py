@@ -80,8 +80,6 @@ pvalue_kwargs: dict[str, Any] = dict(
     yCol="value",
     pairs=PAIRS,
     categories=CATEGORIES,
-    yPad=0.25,
-    yStep=0.6,
 )
 
 title_params: dict[str, Any] = dict(orient="top", anchor="start", offset=4)
@@ -117,7 +115,6 @@ third = (
         categories=THIRD_CATEGORIES,
         bracketStyle="bracket",
         yStart=float(third_df["value"].min()) - 0.25,  # ty: ignore[invalid-argument-type]
-        yStep=-0.5,
         reverse=[("A", "B")],
         testLabelPosition="topLeft",  # → "Mann-Whitney U" (the default pairwise test)
     )

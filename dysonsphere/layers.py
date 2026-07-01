@@ -1381,7 +1381,7 @@ def add_comparisons(
                 )
 
             if yStep is None:
-                yStep = yPad * 1.5
+                yStep = yPad * 2.25
 
             # Assign stacking levels via greedy interval scheduling.
             # Shorter spans go to lower levels so narrow brackets sit closer to the data.
