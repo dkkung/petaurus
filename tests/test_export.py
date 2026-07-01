@@ -309,11 +309,11 @@ class TestSaveUsermeta:
 
         return json.loads((tmp_path / f"{name}_vegalite.json").read_text())["usermeta"]
 
-    def test_generated_block_present(self, simple_chart, tmp_path):
+    def test_provenance_block_present(self, simple_chart, tmp_path):
         save(simple_chart, str(tmp_path / "out"), background=["light"])
-        gen = self._usermeta(tmp_path)["dysonsphere"]["generated"]
-        assert set(gen) == {"script", "user", "timestamp", "python", "altair", "dysonsphere"}
-        assert gen["timestamp"].endswith("Z") and "T" in gen["timestamp"]  # ISO-8601
+        prov = self._usermeta(tmp_path)["dysonsphere"]["provenance"]
+        assert list(prov) == ["user", "script", "timestamp", "python", "altair", "dysonsphere"]  # order matches text
+        assert prov["timestamp"].endswith("Z") and "T" in prov["timestamp"]  # ISO-8601
 
     def test_statistics_records_embedded(self, stats_chart, tmp_path):
         save(stats_chart, str(tmp_path / "out"), background=["light"])
@@ -334,7 +334,7 @@ class TestSaveUsermeta:
         save(chart, str(tmp_path / "out"), background=["light"])
         um = self._usermeta(tmp_path)
         assert um["project"] == "Apollo"  # user's key preserved
-        assert "generated" in um["dysonsphere"]
+        assert "provenance" in um["dysonsphere"]
 
     def test_no_usermeta_when_metadata_disabled(self, stats_chart, tmp_path):
         save(stats_chart, str(tmp_path / "out"), saveMetadata=False, background=["light"])
