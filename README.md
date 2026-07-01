@@ -275,15 +275,15 @@ ds.palette("blues", n=4, reverse=True)  # reversed
 
 When no explicit `scale=` is set on a color encoding, Vega-Lite falls back to the theme's range defaults:
 
-| Range type | Default palette | Used for |
-|---|---|---|
-| `category` | `blues` (even indices: 0, 2, 4, 6, 8, 10) | Nominal/unordered groups |
-| `ordinal` | `blues` | Ordered discrete values |
-| `ramp` | `blues` | Sequential continuous (legend ramps) |
-| `heatmap` | `blues` | Rect/heatmap marks |
-| `diverging` | `redsblues` | Diverging scales |
+| Range type | Default palette | Override with | Used for |
+|---|---|---|---|
+| `category` | `blues` (even indices: 0, 2, 4, 6, 8, 10) | `categoryPalette` | Nominal/unordered groups |
+| `ordinal` | `blues` | `ordinalPalette` | Ordered discrete values |
+| `ramp` | `blues` | `rampPalette` | Sequential continuous (legend ramps) |
+| `heatmap` | `blues` | `heatmapPalette` | Rect/heatmap marks |
+| `diverging` | `redsblues` | `divergingPalette` | Diverging scales |
 
-Setting `ds.theme(palette="mypalette")` overrides all five types simultaneously. To override an individual type, use its `<type>Palette` key (`categoryPalette`, `divergingPalette`, `heatmapPalette`, `ordinalPalette`, `rampPalette`) — each accepts a palette name, a custom palette, a raw hex list, or a Vega scheme name:
+Setting `ds.theme(palette="mypalette")` overrides all five types simultaneously. To override an individual type, set its **Override with** key from the table above — each accepts a palette name, a custom palette, a raw hex list, or a Vega scheme name:
 
 ```python
 ds.theme(divergingPalette="redsblues2", heatmapPalette="greens")   # only those two types change
@@ -299,8 +299,6 @@ divergingPalette = "redsblues2"
 categoryPalette = "reds2"
 heatmapPalette  = ["#ffffff", "#000000"]
 ```
-
-**Precedence:** `palette` is the master switch — when set (via `ds.theme()` or config) it overrides every per-type key. Otherwise each `<type>Palette` applies, falling back to the built-in default above. (For any single key, an explicit `ds.theme()` argument beats the config file, which beats the built-in default.)
 
 > **Note:** The gallery and examples in this README use `palette="blues2"` rather than the shipped default `blues`. `blues2` is a more saturated variant of `blues`.
 
