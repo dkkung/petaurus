@@ -377,19 +377,19 @@ class TestSaveUsermeta:
         assert self._svg_metadata(tmp_path) is None
         assert self._png_dysonsphere_chunk(tmp_path) is None
 
-    def _svg_report(self, tmp_path, name="out_light"):
+    def _svg_report(self, tmp_path, section="statistics", name="out_light"):
         svg = (tmp_path / f"{name}.svg").read_text(encoding="utf-8")
-        m = re.search(r'<metadata id="dysonsphere-report">(.*?)</metadata>', svg, re.DOTALL)
+        m = re.search(rf'<metadata id="dysonsphere-report-{section}">(.*?)</metadata>', svg, re.DOTALL)
         return m.group(1) if m else None
 
-    def _png_report_text(self, tmp_path, name="out_light"):
+    def _png_report_text(self, tmp_path, section="statistics", name="out_light"):
         data = (tmp_path / f"{name}.png").read_bytes()
         i = 8
         while i < len(data):
             length = struct.unpack(">I", data[i : i + 4])[0]
             ctype = data[i + 4 : i + 8]
             chunk = data[i + 8 : i + 8 + length]
-            if ctype == b"iTXt" and chunk.split(b"\x00", 1)[0] == b"dysonsphere-report":
+            if ctype == b"iTXt" and chunk.split(b"\x00", 1)[0] == f"dysonsphere-report-{section}".encode():
                 return chunk.split(b"\x00", 1)[1].lstrip(b"\x00").decode("utf-8")
             i += 12 + length
             if ctype == b"IEND":
@@ -398,10 +398,10 @@ class TestSaveUsermeta:
 
     def test_report_embedded_by_default(self, stats_chart, tmp_path):
         save(stats_chart, str(tmp_path / "out"), background=["light"])
-        report = self._usermeta(tmp_path)["dysonsphere"]["report"]  # JSON member
-        assert report.startswith("Statistics")
-        assert "\n" in self._svg_report(tmp_path)  # SVG readable channel, real newlines
-        assert self._png_report_text(tmp_path).startswith("Statistics")  # PNG readable chunk
+        report = self._usermeta(tmp_path)["dysonsphere"]["report"]  # JSON member: {section: text}
+        assert report["statistics"].startswith("Statistics")  # nested under the report container
+        assert "\n" in self._svg_report(tmp_path)  # SVG per-section readable channel, real newlines
+        assert self._png_report_text(tmp_path).startswith("Statistics")  # PNG per-section chunk
 
     def test_report_not_in_description(self, stats_chart, tmp_path):
         save(stats_chart, str(tmp_path / "out"), description="my caption", background=["light"])
@@ -468,6 +468,8 @@ class TestReadLoad:
         assert isinstance(m, dict)
         assert set(m) == {"provenance", "statistics", "theme", "report"}
         assert m["theme"]["chartWidth"] == 180
+        # report is a container keyed by section, not a bare string
+        assert set(m["report"]) == {"statistics"} and m["report"]["statistics"].startswith("Statistics")
 
     def test_read_report_rerenders_without_embedded_prose(self, tmp_path):
         import numpy as np

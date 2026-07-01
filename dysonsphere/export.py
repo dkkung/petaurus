@@ -177,7 +177,7 @@ def save(
     _records = _drain_reports()
     _usermeta: dict | None = None
     _usermeta_json: str | None = None
-    _report_text: str | None = None
+    _report_sections: dict[str, str] | None = None
     if saveMetadata:
         from .theme import _BUILTIN_DEFAULTS
 
@@ -192,14 +192,15 @@ def save(
         # Same structured block, serialized for the SVG <metadata> and PNG iTXt so those
         # formats are self-contained.  ensure_ascii=False keeps η²/─ literal (UTF-8).
         _usermeta_json = json.dumps(_ds_block, ensure_ascii=False)
-        # embedReport: the human-readable report table.  It's added to `_ds_block` *after*
-        # `_usermeta_json` is serialized, so it rides as a `report` member of the Vega-Lite
-        # `usermeta.dysonsphere` (machine-readable), while the SVG/PNG instead get a
-        # dedicated readable channel below (real newlines, not escaped JSON).  Kept out of
-        # `description`, which stays the user's text only.
+        # embedReport: the human-readable report table(s).  `report` is a *container* keyed
+        # by section (currently just `statistics`) so future renderings can hook in as
+        # siblings.  It's added to `_ds_block` *after* `_usermeta_json` is serialized, so it
+        # rides as a `report` member of the Vega-Lite `usermeta.dysonsphere` (machine-
+        # readable), while the SVG/PNG instead get a dedicated readable channel per section
+        # below (real newlines, not escaped JSON).  Kept out of `description` (user's text).
         if embedReport and _records:
-            _report_text = "\n\n".join(_render_report(r) for r in _records)
-            _ds_block["report"] = _report_text
+            _report_sections = {"statistics": "\n\n".join(_render_report(r) for r in _records)}
+            _ds_block["report"] = _report_sections
 
     # _resolve() is called once per variant (or once for the spec).
     # When chart is a callable it is re-invoked each time so that any
@@ -261,8 +262,9 @@ def save(
             _inserts = ""
             if _usermeta_json is not None:
                 _inserts += f'<metadata id="dysonsphere"><![CDATA[{_usermeta_json}]]></metadata>'
-            if _report_text is not None:
-                _inserts += f'<metadata id="dysonsphere-report">{html.escape(_report_text)}</metadata>'
+            if _report_sections is not None:
+                for _section, _text in _report_sections.items():
+                    _inserts += f'<metadata id="dysonsphere-report-{_section}">{html.escape(_text)}</metadata>'
             if description is not None:
                 _inserts += f"<desc>{html.escape(description)}</desc>"
             if _inserts:
@@ -274,36 +276,45 @@ def save(
                 png_bytes = _inject_png_metadata(png_bytes, description)
             if _usermeta_json is not None:
                 png_bytes = _inject_png_metadata(png_bytes, _usermeta_json, keyword="dysonsphere")
-            if _report_text is not None:
-                png_bytes = _inject_png_metadata(png_bytes, _report_text, keyword="dysonsphere-report")
+            if _report_sections is not None:
+                for _section, _text in _report_sections.items():
+                    png_bytes = _inject_png_metadata(png_bytes, _text, keyword=f"dysonsphere-report-{_section}")
             Path(png_path).write_bytes(png_bytes)
     finally:
         alt.theme.options["darkmode"] = original_darkmode
         alt.theme.options["transparentBackground"] = original_transparent
 
 
-def _read_png_text(png_bytes: bytes, keyword: str) -> str | None:
-    """Return the UTF-8 text of the PNG ``iTXt`` chunk with ``keyword`` (or None)."""
+def _iter_png_itxt(png_bytes: bytes):
+    """Yield ``(keyword, text)`` for every PNG ``iTXt`` chunk."""
     i = 8  # skip the 8-byte PNG signature
-    kw = keyword.encode()
     while i + 8 <= len(png_bytes):
         length = int.from_bytes(png_bytes[i : i + 4], "big")
         ctype = png_bytes[i + 4 : i + 8]
         chunk = png_bytes[i + 8 : i + 8 + length]
-        if ctype == b"iTXt" and chunk.split(b"\x00", 1)[0] == kw:
+        if ctype == b"iTXt":
+            kw, rest = chunk.split(b"\x00", 1)
             # keyword\0 + compflag/method/lang/transkw nulls + text
-            return chunk.split(b"\x00", 1)[1].lstrip(b"\x00").decode("utf-8")
+            yield kw.decode("utf-8"), rest.lstrip(b"\x00").decode("utf-8")
         if ctype == b"IEND":
             break
         i += 12 + length
-    return None
+
+
+def _read_png_text(png_bytes: bytes, keyword: str) -> str | None:
+    """Return the UTF-8 text of the PNG ``iTXt`` chunk with ``keyword`` (or None)."""
+    return next((t for kw, t in _iter_png_itxt(png_bytes) if kw == keyword), None)
+
+
+_REPORT_PREFIX = "dysonsphere-report-"
 
 
 def _read_dysonsphere_block(path: str) -> dict:
     """Read the embedded ``usermeta.dysonsphere`` block from a dysonsphere-exported PNG,
     SVG, or Vega-Lite JSON (detected by extension), as the unified
-    ``{provenance, statistics, theme, report}`` dict.  For SVG/PNG the ``report`` (which
-    rides in its own readable channel) is merged back in.  Raises if none is found.
+    ``{provenance, statistics, theme, report}`` dict.  For SVG/PNG the ``report`` container
+    (whose sections ride in their own readable channels) is merged back in.  Raises if none
+    is found.
     """
     p = Path(path)
     ext = p.suffix.lower()
@@ -313,16 +324,19 @@ def _read_dysonsphere_block(path: str) -> dict:
         svg = p.read_text(encoding="utf-8")
         m = re.search(r'<metadata id="dysonsphere"><!\[CDATA\[(.*?)\]\]></metadata>', svg, re.DOTALL)
         block = json.loads(m.group(1)) if m else None
-        r = re.search(r'<metadata id="dysonsphere-report">(.*?)</metadata>', svg, re.DOTALL)
-        if block is not None and r is not None:
-            block["report"] = html.unescape(r.group(1))
+        sections = {
+            sec: html.unescape(txt)
+            for sec, txt in re.findall(r'<metadata id="dysonsphere-report-([^"]+)">(.*?)</metadata>', svg, re.DOTALL)
+        }
+        if block is not None and sections:
+            block["report"] = sections
     elif ext == ".png":
         data = p.read_bytes()
         struct = _read_png_text(data, "dysonsphere")
         block = json.loads(struct) if struct is not None else None
-        rep = _read_png_text(data, "dysonsphere-report")
-        if block is not None and rep is not None:
-            block["report"] = rep
+        sections = {kw[len(_REPORT_PREFIX) :]: t for kw, t in _iter_png_itxt(data) if kw.startswith(_REPORT_PREFIX)}
+        if block is not None and sections:
+            block["report"] = sections
     else:
         raise ValueError(f"read() supports .png, .svg, or .json files, got {p.suffix!r}")
     if block is None:
@@ -341,11 +355,12 @@ def read(path: str, *, what: str = "report", save: bool | str = False) -> "str |
         Which artifact to return:
 
         - ``'report'`` (default) — the human-readable report **table** as a ``str``;
-          it is printed to stdout and returned. Falls back to re-rendering it from the
-          embedded ``statistics`` records if the prose text wasn't saved
-          (``embedReport=False``).
+          it is printed to stdout and returned. Joins every section of the ``report``
+          container (currently just ``statistics``). Falls back to re-rendering from the
+          embedded ``statistics`` records if the prose wasn't saved (``embedReport=False``).
         - ``'statistics'`` — the structured **records** (list of dicts, exact floats).
-        - ``'metadata'`` — the whole ``{provenance, statistics, theme, report}`` dict.
+        - ``'metadata'`` — the whole ``{provenance, statistics, theme, report}`` dict, where
+          ``report`` is the ``{section: text}`` container.
     save:
         Only for ``what='report'``: ``True`` writes the report to a ``.txt`` in the cwd;
         a string writes to that directory.
@@ -357,8 +372,10 @@ def read(path: str, *, what: str = "report", save: bool | str = False) -> "str |
         return block.get("statistics", [])
     if what != "report":
         raise ValueError(f"what must be 'report', 'statistics', or 'metadata', got {what!r}")
-    text = block.get("report")
-    if text is None:  # prose wasn't embedded (embedReport=False) — re-render from records
+    report = block.get("report")  # {section: text} container
+    if report:
+        text = "\n\n".join(report.values())
+    else:  # prose wasn't embedded (embedReport=False) — re-render from records
         from .statistics import _render_report
 
         text = "\n\n".join(_render_report(r) for r in block.get("statistics", []))
