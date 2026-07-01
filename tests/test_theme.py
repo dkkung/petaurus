@@ -63,6 +63,46 @@ class TestThemeDefaults:
         theme(darkmode=True)
         assert alt.theme.options["chartFill"] is None
 
+    def test_secondary_font_size_default(self):
+        theme()  # fontSize=7
+        assert alt.theme.options["secondaryFontSize"] == 6  # fontSize - 1
+
+    def test_secondary_font_size_scales(self):
+        theme(fontSize=12)
+        assert alt.theme.options["secondaryFontSize"] == 11
+
+    def test_secondary_font_size_explicit(self):
+        theme(fontSize=12, secondaryFontSize=8)
+        assert alt.theme.options["secondaryFontSize"] == 8
+
+    def test_secondary_font_size_floored_at_smallest(self):
+        theme(fontSize=5)  # fontSize - 1 = 4, but floored to smallestFontSize (5)
+        assert alt.theme.options["secondaryFontSize"] == 5
+
+    def test_secondary_font_size_escape_hatch_below_floor(self):
+        theme(fontSize=3)  # fontSize < smallest → floor bypassed, tier follows the base
+        assert alt.theme.options["secondaryFontSize"] == 2  # max(1, 3 - 1)
+
+    def test_smallest_font_size_default(self):
+        theme()
+        assert alt.theme.options["smallestFontSize"] == 5  # fixed floor, not derived
+
+    def test_smallest_font_size_custom_int(self):
+        theme(smallestFontSize=4)
+        assert alt.theme.options["smallestFontSize"] == 4
+        assert alt.theme.options["fontSize"] == 7  # int does not minimize
+
+    def test_smallest_font_size_true_minimizes_and_floors_secondary(self):
+        theme(smallestFontSize=True)
+        assert alt.theme.options["fontSize"] == 5  # base dropped to the floor
+        assert alt.theme.options["secondaryFontSize"] == 5  # tier floored too, not 4
+        assert alt.theme.options["smallestFontSize"] == 5
+
+    def test_smallest_font_size_false_is_retrievable_int(self):
+        theme(smallestFontSize=False)
+        assert alt.theme.options["smallestFontSize"] == 5
+        assert alt.theme.options["fontSize"] == 7  # no minimize
+
     def test_options_reset_on_each_call(self):
         theme(grid=True)
         assert alt.theme.options["grid"] is True

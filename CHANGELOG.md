@@ -4,6 +4,8 @@
 
 ### New features
 
+- **`theme()` `secondaryFontSize=`** - a smaller font tier for in-plot annotations, auto-derived as `fontSize - 1` (so `6` at the default `fontSize=7`) and never dropping below `smallestFontSize`, unless set explicitly. `add_comparisons()` bracket/omnibus labels and `add_correlation()` readouts now default to it.
+- **`theme()` `smallestFontSize=`** - a fixed small font size (`5` pt) that also floors `secondaryFontSize`. Accepts an `int` or a `bool`: `True` minimizes the plot by setting `fontSize` to it; an `int` overrides the value; otherwise it's simply retrievable via `alt.theme.options`. Pass a smaller `fontSize` directly to go below it.
 - **`add_correlation()`** - annotate a scatter with a correlation coefficient. `method="pearson"` (default; matches pandas' `DataFrame.corr`) draws the OLS fit line; `"spearman"` / `"kendall"` report the rank coefficient with no line. The corner readout is composed from independent parts — `coefficient` (`"r"` / `"r2"` / `"both"`), `includePvalue`, `includeEquation`, with `verbose=True` as a "show everything" shortcut — and defaults to just the coefficient. The fit line inherits the theme's `mark_line` config, with curated overrides (`color`/`strokeWidth`/`strokeDash`/`opacity`), a raw `lineStyle` dict passthrough, and `line=False` to suppress. Feeds the same structured metadata as `add_comparisons()`.
 
 ### Deprecated

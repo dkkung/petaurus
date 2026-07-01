@@ -49,20 +49,17 @@ def scatter(df: pl.DataFrame) -> alt.Chart:
     )
 
 
-left = (scatter(linear_df) + ds.add_correlation(linear_df, "x", "y", fontSize=fontSize)).properties(
+left = (scatter(linear_df) + ds.add_correlation(linear_df, "x", "y")).properties(
     title=alt.TitleParams(['method="pearson"'], fontSize=fontSize, **title_params)
 )
 
 middle = (
-    scatter(curved_df)
-    + ds.add_correlation(curved_df, "x", "y", method="spearman", includePvalue=True, fontSize=fontSize)
+    scatter(curved_df) + ds.add_correlation(curved_df, "x", "y", method="spearman", includePvalue=True)
 ).properties(title=alt.TitleParams(['method="spearman"', "includePvalue=True"], fontSize=fontSize, **title_params))
 
 right = (
     scatter(linear_df)
-    + ds.add_correlation(
-        linear_df, "x", "y", verbose=True, color="#c0392b", lineStyle={"strokeDash": [4, 2]}, fontSize=fontSize
-    )
+    + ds.add_correlation(linear_df, "x", "y", verbose=True, color="#c0392b", lineStyle={"strokeDash": [4, 2]})
 ).properties(
     title=alt.TitleParams(
         ["verbose=True", 'color="#c0392b", lineStyle={"strokeDash": [4, 2]}'], fontSize=fontSize, **title_params

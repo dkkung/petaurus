@@ -43,6 +43,8 @@ _BUILTIN_DEFAULTS: dict[str, Any] = {
     "dashedWidth": [2, 2],
     "font": "HelveticaNeue",
     "fontSize": 7,
+    "secondaryFontSize": None,
+    "smallestFontSize": 5,
     "fontStyle": "normal",
     "fontWeight": 400,
     "grid": False,
@@ -208,6 +210,18 @@ def theme(style: str | None = None, **kwargs: Any) -> None:
         p["cornerRadius"] = min(p["chartWidth"], p["chartHeight"]) / 100
     if p["chartFill"] is None and not p["darkmode"]:
         p["chartFill"] = "white"
+    # smallestFontSize is a fixed floor (5) and a minimize switch: True drops the whole
+    # plot's base font to it; False / an int just leaves it retrievable.
+    if p["smallestFontSize"] is True:
+        p["smallestFontSize"] = 5
+        p["fontSize"] = p["smallestFontSize"]
+    elif p["smallestFontSize"] is False:
+        p["smallestFontSize"] = 5
+    if p["secondaryFontSize"] is None:
+        p["secondaryFontSize"] = max(1, p["fontSize"] - 1)  # smaller tier for in-plot annotations
+        if p["fontSize"] >= p["smallestFontSize"]:  # don't let the tier dip below the floor …
+            p["secondaryFontSize"] = max(p["secondaryFontSize"], p["smallestFontSize"])
+        # … unless the user explicitly set fontSize below the floor (escape hatch)
 
     # Resolve every palette-valued key: a name in `colors` (built-in or custom)
     # becomes its hex list; anything else (a raw list, or a Vega scheme name) is

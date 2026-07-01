@@ -884,7 +884,7 @@ def _pvalue_layer(
     if strokeWidth is None:
         strokeWidth = alt.theme.options.get("axisWidth", 0.5)
     if fontSize is None:
-        fontSize = 6
+        fontSize = alt.theme.options.get("secondaryFontSize", 6)
 
     # --- categories and text x position ---
     if categories is None:
@@ -1137,7 +1137,8 @@ def add_comparisons(
         Stroke width of bracket lines. Inherits ``axisWidth`` from
         ``ds.theme()`` when not set.
     fontSize:
-        Font size of p-value labels. Defaults to ``6``.
+        Font size of the p-value / corner labels. Defaults to the theme's
+        ``secondaryFontSize`` (``fontSize - 1``, i.e. ``6`` at the default ``fontSize=7``).
     reverse:
         List of ``(group1, group2)`` tuples identifying brackets to flip —
         text moves below the bar and ticks point upward.
@@ -1288,7 +1289,7 @@ def add_comparisons(
                     position=omnibusPosition,
                     offsetX=omnibusOffsetX,
                     offsetY=omnibusOffsetY,
-                    fontSize=fontSize if fontSize is not None else 6,
+                    fontSize=fontSize if fontSize is not None else alt.theme.options.get("secondaryFontSize", 6),
                 )
             )
 
@@ -1553,7 +1554,8 @@ def add_correlation(
     offsetX, offsetY:
         Pixel nudges for the readout, forwarded to ``add_text``.
     fontSize:
-        Font size of the readout. Defaults to ``6``.
+        Font size of the readout. Defaults to the theme's ``secondaryFontSize``
+        (``fontSize - 1``, i.e. ``6`` at the default ``fontSize=7``).
     decimals, notation:
         Control the p-value format in the readout, as in ``add_comparisons``.
     color, strokeWidth, strokeDash, opacity:
@@ -1649,7 +1651,7 @@ def add_correlation(
                 position=position,
                 offsetX=offsetX,
                 offsetY=offsetY,
-                fontSize=fontSize if fontSize is not None else 6,
+                fontSize=fontSize if fontSize is not None else alt.theme.options.get("secondaryFontSize", 6),
             )
         )
 

@@ -234,6 +234,11 @@ class TestAddComparisons:
         label = spec["layer"][0]["layer"][-1]["data"]["values"][0]["label"]
         assert label == "P = 0.023"
 
+    def test_label_uses_secondary_font_size(self, group_df):
+        theme(chartWidth=200, chartHeight=200, fontSize=10)  # secondaryFontSize = 9
+        spec = add_comparisons(group_df, "group", "value", [("A", "B")], pvalues=[0.01]).to_dict()
+        assert spec["layer"][0]["layer"][-1]["mark"]["fontSize"] == 9
+
 
 # ── Pure statistics module (dysonsphere.statistics) ─────────────────────────
 from dysonsphere import statistics as st  # noqa: E402
