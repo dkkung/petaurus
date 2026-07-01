@@ -821,7 +821,7 @@ def _pvalue_layer(
     y: float | None = None,
     y_pad: float = 5,
     tick_height: float = 0.5,
-    bracket_style: str = "line",
+    bracket_style: str = "bracket",
     label_style: str = "p",
     categories: list | None = None,
     chartWidth: int | None = None,
@@ -884,7 +884,7 @@ def _pvalue_layer(
     if strokeWidth is None:
         strokeWidth = alt.theme.options.get("axisWidth", 0.5)
     if fontSize is None:
-        fontSize = alt.theme.options.get("secondaryFontSize", 6)
+        fontSize = alt.theme.options.get("fontSize", 7)
 
     # --- categories and text x position ---
     if categories is None:
@@ -964,13 +964,14 @@ def _pvalue_layer(
 _MATRIX_POSTHOCS = {"tukey_hsd", "dunn", "nemenyi", "games_howell"}
 
 
-def _omnibus_label(result, *, verbose: bool, labelStyle: str, notation: str | None, decimals: int) -> str:
-    """Build the terse or verbose corner-label string from an omnibus result."""
-    p_str = (
-        _format_asterisks(result.pvalue)
-        if labelStyle == "asterisks"
-        else _format_pvalue(result.pvalue, decimals=decimals, notation=notation)
-    )
+def _omnibus_label(result, *, verbose: bool, notation: str | None, decimals: int) -> str:
+    """Build the terse or verbose corner-label string from an omnibus result.
+
+    Always uses the p-value format (never asterisks) — ``labelStyle="asterisks"``
+    only applies to the pairwise brackets; an omnibus *result* readout like
+    ``Kruskal-Wallis ***`` reads oddly.
+    """
+    p_str = _format_pvalue(result.pvalue, decimals=decimals, notation=notation)
     if not verbose:
         return f"{result.name} {p_str}"
     df_str = ", ".join(str(d) for d in result.df)
@@ -1028,7 +1029,7 @@ def add_comparisons(
     yPad: float | None = None,
     categories: list | None = None,
     chartWidth: int | None = None,
-    bracketStyle: str = "line",
+    bracketStyle: str = "bracket",
     labelStyle: str = "p",
     tickHeight: float | None = None,
     strokeWidth: float | None = None,
@@ -1127,14 +1128,15 @@ def add_comparisons(
         Width of the chart in pixels, used to compute text x positions.
         Auto-detected from ``ds.theme()`` when not set.
     bracketStyle:
-        ``'line'`` (horizontal bar only) or ``'bracket'`` (bar + end ticks).
+        ``'bracket'`` (default; bar + end ticks) or ``'line'`` (horizontal bar only).
     labelStyle:
         ``'p'`` (default) renders ``P = 0.012`` / ``P < 0.001``. ``'asterisks'``
         renders ``*`` / ``**`` / ``***`` / ``ns``.
     tickHeight:
-        Height of bracket end ticks in data units. Defaults to
-        ``yStep * 0.25`` so ticks scale naturally with bracket spacing.
-        Only used when ``bracketStyle='bracket'``.
+        Height of bracket end ticks in data units. Defaults to the theme's
+        ``tickSize`` (converted from px to data units), so bracket ticks match the
+        axis ticks. Always positive, so it works with reverse (negative-``yStep``)
+        brackets without an explicit override. Only used when ``bracketStyle='bracket'``.
     strokeWidth:
         Stroke width of bracket lines. Inherits ``axisWidth`` from
         ``ds.theme()`` when not set.
@@ -1301,9 +1303,7 @@ def add_comparisons(
         if testLabel is not None:
             label_text = testLabel
         elif is_omnibus:
-            label_text = _omnibus_label(
-                omnibus_result, verbose=omnibusVerbose, labelStyle=labelStyle, notation=notation, decimals=decimals
-            )
+            label_text = _omnibus_label(omnibus_result, verbose=omnibusVerbose, notation=notation, decimals=decimals)
         else:
             label_text = _TEST_DISPLAY.get(test, test)
         annotation_layers.append(
@@ -1314,7 +1314,7 @@ def add_comparisons(
                 position=resolved_pos,
                 offsetX=testLabelOffsetX,
                 offsetY=testLabelOffsetY,
-                fontSize=fontSize if fontSize is not None else alt.theme.options.get("secondaryFontSize", 6),
+                fontSize=fontSize if fontSize is not None else alt.theme.options.get("fontSize", 7),
             )
         )
 
@@ -1351,35 +1351,31 @@ def add_comparisons(
             computed_pvalues = [pval_lookup[frozenset((g1, g2))] for g1, g2 in pairs]
 
         # --- y positioning ---
+        annotated_groups_for_pad = list({g for pair in pairs for g in pair})
+        y_vals = df.filter(pl.col(xCol).is_in(annotated_groups_for_pad))[yCol]
+        y_range = cast(float, y_vals.cast(pl.Float64).max() or 0.0) - cast(float, y_vals.cast(pl.Float64).min() or 0.0)
+        chart_height = alt.theme.options.get("chartHeight", 100)
         if yPad is None:
-            annotated_groups_for_pad = list({g for pair in pairs for g in pair})
-            y_vals = df.filter(pl.col(xCol).is_in(annotated_groups_for_pad))[yCol]
-            y_range = cast(float, y_vals.cast(pl.Float64).max() or 0.0) - cast(
-                float, y_vals.cast(pl.Float64).min() or 0.0
-            )
-            chart_height = alt.theme.options.get("chartHeight", 100)
             yPad = (10.0 if bracketStyle == "bracket" else 8.0) * y_range / chart_height
+        # Bracket end-tick height matches the theme's tickSize (px → data units). Always
+        # positive, so it no longer flips sign with a negative yStep (reverse brackets).
+        if tickHeight is None:
+            tickHeight = alt.theme.options.get("tickSize", 3) * y_range / chart_height if chart_height else 0.0
 
         if yPositions is not None:
             final_y = list(yPositions)
-            if tickHeight is None:
-                tickHeight = (yPad * 2) * 0.25
         else:
             if yStart is None:
-                annotated_groups = list({g for pair in pairs for g in pair})
                 yStart = (
                     cast(
                         float,
-                        df.filter(pl.col(xCol).is_in(annotated_groups))[yCol].cast(pl.Float64).max() or 0.0,
+                        df.filter(pl.col(xCol).is_in(annotated_groups_for_pad))[yCol].cast(pl.Float64).max() or 0.0,
                     )
                     + yPad
                 )
 
             if yStep is None:
                 yStep = yPad * 2
-
-            if tickHeight is None:
-                tickHeight = yStep * 0.25
 
             # Assign stacking levels via greedy interval scheduling.
             # Shorter spans go to lower levels so narrow brackets sit closer to the data.
@@ -1666,7 +1662,7 @@ def add_correlation(
                 position=position,
                 offsetX=offsetX,
                 offsetY=offsetY,
-                fontSize=fontSize if fontSize is not None else alt.theme.options.get("secondaryFontSize", 6),
+                fontSize=fontSize if fontSize is not None else alt.theme.options.get("fontSize", 7),
             )
         )
 

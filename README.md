@@ -125,7 +125,7 @@ ds.theme(   # custom configuration
 | `dashedWidth` | `[2, 2]` | Dash/gap pattern `[dash, gap]` in pixels |
 | `font` | `"HelveticaNeue"` | Font family for all labels and titles |
 | `fontSize` | `7` | Font size in points (titles, axis labels — the primary tier) |
-| `secondaryFontSize` | `fontSize - 1` | Smaller tier for in-plot annotations (`add_comparisons` / `add_correlation` labels). Auto-derived from `fontSize` (but never below `smallestFontSize`, unless you set `fontSize` below it) unless set explicitly |
+| `secondaryFontSize` | `fontSize - 1` | An auxiliary smaller font size, auto-derived from `fontSize` (never below `smallestFontSize`, unless you set `fontSize` below it) unless set explicitly. Available for your own annotations; not consumed by the built-in defaults |
 | `smallestFontSize` | `5` | A fixed small font size (points) that also floors `secondaryFontSize`. Accepts an `int` or a `bool`: `True` minimizes the plot by setting `fontSize` to it; an `int` overrides the value; `False` / omitted leaves it simply retrievable. To go below it, pass a smaller `fontSize` directly |
 | `fontWeight` | `400` | Font weight: 300 = light, 400 = normal, 700 = bold |
 | `grid` | `False` | Show axis grid lines |
@@ -621,13 +621,13 @@ The supported post-hocs are Tukey HSD and Dunnett (via `scipy`) plus **Dunn, Nem
 | `yStart` | auto | Y position of the lowest bracket |
 | `yStep` | `yPad * 2` | Vertical distance between stacking levels |
 | `yPad` | auto | Padding above data max when `yStart` is auto-placed. Defaults to a fixed ~8 px visual gap (`bracketStyle="line"`) or ~10 px (`bracketStyle="bracket"`), scaled to data units via `chartHeight` |
-| `bracketStyle` | `"line"` | `"line"` (bar only) or `"bracket"` (bar + end ticks) |
-| `labelStyle` | `"p"` | `"p"` renders `P = 0.012` / `P < 0.001`; `"asterisks"` renders `*` / `**` / `***` / `ns` |
-| `tickHeight` | `yStep * 0.25` | End tick height in data units (only for `bracketStyle="bracket"`) |
+| `bracketStyle` | `"bracket"` | `"bracket"` (bar + end ticks) or `"line"` (bar only) |
+| `labelStyle` | `"p"` | `"p"` renders `P = 0.012` / `P < 0.001`; `"asterisks"` renders `*` / `**` / `***` / `ns` (brackets only — the omnibus label always shows the p-value) |
+| `tickHeight` | `tickSize` | End tick height, defaulting to the theme's `tickSize` (px → data units) so bracket ticks match the axis ticks. Only for `bracketStyle="bracket"` |
 | `reverse` | `None` | List of `(group1, group2)` tuples identifying brackets to flip below the bar |
 | `categories` | inferred | Ordered list of all x-axis categories |
 | `chartWidth` | `theme(chartWidth)` | Chart width for computing text x position; auto-read from the active theme, rarely needs to be set explicitly |
-| `fontSize` | `secondaryFontSize` | Font size of the p-value / corner labels; defaults to the theme's `secondaryFontSize` (`fontSize - 1`) |
+| `fontSize` | `theme(fontSize)` | Font size of the p-value / corner labels; defaults to the theme's `fontSize` |
 | `decimals` | `3` | Decimal places in the p-value label when `labelStyle="p"`. Also sets the display threshold: values below `10^(-decimals)` show as `P < 0.001`. For `notation="scientific"` or `"e"`, controls mantissa decimal places. Ignored for `notation="power"` |
 | `notation` | `None` | Number format for `labelStyle="p"`. `None` uses `P = 0.012` / `P < 0.001` style. `"scientific"` → `P = 1.23×10⁻⁵`. `"e"` → `P = 1.23e-05`. `"power"` → `P ≈ 10⁻⁵` (rounds to nearest power of 10 — values within the same order of magnitude get the same label, so best for widely spread p-values). `"si"` raises `ValueError` |
 | `testLabelPosition` | `"auto"` | Corner preset for the single **test label**, whose content adapts: the omnibus **result** (`ANOVA P = 0.003`) for omnibus tests, or the pairwise **test name** (`Mann-Whitney U`) for pairwise tests. `"auto"` shows it at `"topLeft"` for omnibus and hides it for pairwise (opt-in); a preset draws it there; `None` hides it (result still computed for the report/metadata) |
@@ -697,7 +697,7 @@ The readout is composed from independent parts — by default it shows just the 
 | `includeEquation` | `False` | Pearson only — append the fit equation `, y = 0.84x + 0.27` |
 | `verbose` | `False` | Shortcut: `True` = `coefficient="both", includePvalue=True, includeEquation=True` (overrides those three) |
 | `offsetX`, `offsetY` | `0` | Pixel nudges for the readout |
-| `fontSize` | `secondaryFontSize` | Font size of the readout; defaults to the theme's `secondaryFontSize` (`fontSize - 1`) |
+| `fontSize` | `theme(fontSize)` | Font size of the readout; defaults to the theme's `fontSize` |
 | `decimals`, `notation` | `3`, `None` | Control the p-value format in the readout (as in `add_comparisons`) |
 | `color`, `strokeWidth`, `strokeDash`, `opacity` | `None` (inherit) | Curated style overrides for the fit line (the same four knobs as `add_rule`). Each defaults to `None`, so the line inherits the theme's `mark_line` config; set one to override just that property |
 | `lineStyle` | `None` | A dict of raw `mark_line` properties merged in last, so any Vega-Lite line property is reachable. Keys here **override** the curated `color`/`strokeWidth`/etc. above |

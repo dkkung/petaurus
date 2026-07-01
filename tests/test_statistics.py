@@ -234,10 +234,10 @@ class TestAddComparisons:
         label = spec["layer"][0]["layer"][-1]["data"]["values"][0]["label"]
         assert label == "P = 0.023"
 
-    def test_label_uses_secondary_font_size(self, group_df):
-        theme(chartWidth=200, chartHeight=200, fontSize=10)  # secondaryFontSize = 9
+    def test_label_uses_primary_font_size(self, group_df):
+        theme(chartWidth=200, chartHeight=200, fontSize=10)  # statistics labels use fontSize
         spec = add_comparisons(group_df, "group", "value", [("A", "B")], pvalues=[0.01]).to_dict()
-        assert spec["layer"][0]["layer"][-1]["mark"]["fontSize"] == 9
+        assert spec["layer"][0]["layer"][-1]["mark"]["fontSize"] == 10
 
 
 def _text_labels(layer):
@@ -290,6 +290,36 @@ class TestTestLabel:
             tri_df, "g", "v", categories=MULTI, test="anova", testLabelPosition=None, testLabelX=1.0, testLabelY=2.0
         )
         assert _text_labels(layer)[0].startswith("ANOVA P")
+
+    def test_omnibus_label_never_asterisks(self, tri_df):
+        # labelStyle="asterisks" affects only the brackets, not the omnibus result label
+        layer = add_comparisons(tri_df, "g", "v", categories=MULTI, test="kruskal", labelStyle="asterisks")
+        label = _text_labels(layer)[0]
+        assert " P " in label and "*" not in label
+
+
+class TestTickHeight:
+    @pytest.fixture
+    def tri_df(self):
+        rng = np.random.default_rng(0)
+        return pl.DataFrame({"g": ["A"] * 12 + ["B"] * 12 + ["C"] * 12, "v": rng.normal(0, 1, 36)})
+
+    def test_tick_height_defaults_to_tick_size(self, tri_df):
+        # bracket end-tick height (data units) = tickSize(px) * y_range / chartHeight
+        theme(chartWidth=200, chartHeight=200, tickSize=3)
+        sub = tri_df.filter(pl.col("g").is_in(["A", "B"]))
+        y_range = float(sub["v"].max() - sub["v"].min())
+        expected = 3 * y_range / 200
+        layer = add_comparisons(tri_df, "g", "v", [("A", "B")], categories=MULTI, bracketStyle="bracket")
+        # the end-tick sub-layers carry y/y2 whose gap equals tickHeight
+        spec = layer.to_dict()
+        gaps = [
+            abs(v["y"] - v["y2"])
+            for sub in spec["layer"][0]["layer"]
+            for v in sub.get("data", {}).get("values", [])
+            if "y" in v and "y2" in v
+        ]
+        assert any(abs(g - expected) < 1e-9 for g in gaps)
 
 
 class TestCorrectionMetadata:
