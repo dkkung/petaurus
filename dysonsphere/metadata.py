@@ -279,41 +279,9 @@ def _read_dysonsphere_block(path: str) -> dict:
 _DATA_OUTPUTS = ("polars", "pandas", "duckdb", "records")
 
 
-def _read_data(path: str, output: str) -> Any:
-    """Rebuild the primary data from a Vega-Lite JSON (the ``.json`` spec) in the requested
-    ``output`` form.
-
-    Altair inlines the whole ``alt.Chart(df)`` frame — **every column, even unused ones** —
-    as a named dataset (or inline ``data.values``).  We take the *largest* embedded row-list
-    (smaller ones are annotation-layer data) and return it as:
-    ``"polars"`` (default) → ``pl.DataFrame``; ``"pandas"`` → ``pd.DataFrame``; ``"duckdb"`` →
-    a ``DuckDBPyRelation``; ``"records"`` → the raw ``list[dict]`` (zero-dependency).  Dtypes
-    are re-inferred from JSON.  pandas/duckdb are imported lazily (clear error if missing).
-    """
-    if output not in _DATA_OUTPUTS:
-        raise ValueError(f"output must be one of {_DATA_OUTPUTS}, got {output!r}")
-    p = Path(path)
-    if p.suffix.lower() != ".json":
-        raise ValueError(f"what='data' needs the Vega-Lite JSON (the .json spec), got {p.suffix!r}")
-    spec = json.loads(p.read_text(encoding="utf-8"))
-    candidates: list[list] = [v for v in (spec.get("datasets") or {}).values() if isinstance(v, list)]
-
-    def walk(o):
-        if isinstance(o, dict):
-            data = o.get("data")
-            if isinstance(data, dict) and isinstance(data.get("values"), list):
-                candidates.append(data["values"])
-            for v in o.values():
-                walk(v)
-        elif isinstance(o, list):
-            for v in o:
-                walk(v)
-
-    walk(spec)
-    rows = max(candidates, key=len, default=[])
-    if not rows:
-        raise ValueError(f"no embedded data found in {path!r} (was the DataFrame inlined at save time?)")
-
+def _rows_as(rows: list, output: str) -> Any:
+    """Materialize a list of record dicts in the requested ``output`` form (pandas/duckdb
+    imported lazily, with a clear error if missing)."""
     if output == "records":
         return rows  # raw list[dict] — no dataframe library needed
     if output == "pandas":
@@ -335,7 +303,66 @@ def _read_data(path: str, output: str) -> Any:
     return duckdb.from_arrow(df.to_arrow())  # a queryable DuckDBPyRelation (pyarrow via polars)
 
 
-def read(path: str, *, what: str = "report", save: bool | str = False, output: str = "polars") -> Any:
+def _read_data(path: str, output: str, dataset: str | None) -> Any:
+    """Rebuild the user's data from a Vega-Lite JSON (the ``.json`` spec).
+
+    Altair inlines the whole ``alt.Chart(df)`` frame — **every column, even unused ones** —
+    as named datasets.  dysonsphere's own composite marks/annotations also embed small
+    internal sidecar datasets, each tagged with the ``_INTERNAL_COL`` sentinel; those are
+    filtered out here so only the user's frame(s) remain.  ``dataset``: ``None`` (default)
+    returns the single user frame — **raising** (with a listing) if there are ≥2, so a
+    multi-frame chart is never silently truncated; ``"all"`` returns a ``{name: frame}`` dict;
+    ``"<name>"`` returns one by name.  Each frame is materialized in the ``output`` form.
+    """
+    from .utils import _INTERNAL_COL
+
+    if output not in _DATA_OUTPUTS:
+        raise ValueError(f"output must be one of {_DATA_OUTPUTS}, got {output!r}")
+    p = Path(path)
+    if p.suffix.lower() != ".json":
+        raise ValueError(f"what='data' needs the Vega-Lite JSON (the .json spec), got {p.suffix!r}")
+    spec = json.loads(p.read_text(encoding="utf-8"))
+
+    # Collect every embedded row-list by name (named datasets, then any inline data.values).
+    named: dict[str, list] = {n: r for n, r in (spec.get("datasets") or {}).items() if isinstance(r, list)}
+    _inline = [0]
+
+    def walk(o):
+        if isinstance(o, dict):
+            d = o.get("data")
+            if isinstance(d, dict) and isinstance(d.get("values"), list):
+                named[f"inline-{_inline[0]}"] = d["values"]
+                _inline[0] += 1
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+
+    walk(spec)
+    # User frames = non-empty datasets WITHOUT the internal sentinel column.
+    user = {n: r for n, r in named.items() if r and _INTERNAL_COL not in r[0]}
+
+    if dataset == "all":
+        return {n: _rows_as(r, output) for n, r in user.items()}
+    if dataset is not None:
+        if dataset not in user:
+            raise ValueError(f"dataset {dataset!r} not found in {path!r}; available: {sorted(user)}")
+        return _rows_as(user[dataset], output)
+    if len(user) == 1:
+        return _rows_as(next(iter(user.values())), output)
+    if not user:
+        raise ValueError(f"no user data found in {path!r} (was the DataFrame inlined at save time?)")
+    listing = ", ".join(f"{n!r} ({len(r)} rows, cols {list(r[0])})" for n, r in user.items())
+    raise ValueError(
+        f"{len(user)} user datasets in {path!r}: {listing}. "
+        f"Pass dataset='all' for a dict of all, or dataset='<name>' for one."
+    )
+
+
+def read(
+    path: str, *, what: str = "report", save: bool | str = False, output: str = "polars", dataset: str | None = None
+) -> Any:
     """Read back the metadata (or data) embedded by :func:`save` from a PNG, SVG, or JSON.
 
     Parameters
@@ -366,7 +393,7 @@ def read(path: str, *, what: str = "report", save: bool | str = False, output: s
         ``duckdb`` are imported lazily and are not package dependencies.
     """
     if what == "data":
-        return _read_data(path, output)
+        return _read_data(path, output, dataset)
     block = _read_dysonsphere_block(path)
     if what == "metadata":
         return block

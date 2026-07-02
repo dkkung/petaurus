@@ -372,6 +372,79 @@ class TestReadLoad:
         with pytest.raises(ValueError, match="output must be one of"):
             ds.read(self._data_json(tmp_path), what="data", output="dask")
 
+    def test_read_data_filters_internal_sidecars(self, tmp_path):
+        # Every dysonsphere composite chart embeds internal sidecar datasets; read(what="data")
+        # must filter them (via the sentinel) and return exactly ONE user frame per chart.  This
+        # is the safety net: a newly-untagged internal data source makes one of these fail.
+        import numpy as np
+
+        import dysonsphere as ds
+
+        rng = np.random.default_rng(0)
+        df = pl.DataFrame({"g": ["A"] * 15 + ["B"] * 15 + ["C"] * 15, "v": rng.normal(0, 1, 45)})
+        dfx = pl.DataFrame({"x": rng.uniform(0, 10, 30), "y": rng.normal(0, 1, 30)})
+        dlog = pl.DataFrame({"x": [1.0, 10, 100, 1000] * 3, "y": [1.0, 10, 100, 1000] * 3})
+        cats = ["A", "B", "C"]
+        box = alt.Chart(df).mark_boxplot().encode(x="g:N", y="v:Q")
+        pts = alt.Chart(dfx).mark_point().encode(x="x:Q", y="y:Q")
+        logc = alt.Chart(dlog).mark_point().encode(x="x:Q", y=alt.Y("y:Q", scale=alt.Scale(type="log")))
+        charts = {
+            "mark_strip": (ds.mark_strip(df, "g", "v", cats), {"g", "v"}),
+            "mark_violin": (ds.mark_violin(df, "g", "v", cats), {"g", "v"}),
+            "add_comparisons": (box + ds.add_comparisons(df, "g", "v", [("A", "B")], categories=cats), {"g", "v"}),
+            "add_correlation": (pts + ds.add_correlation(dfx, "x", "y"), {"x", "y"}),
+            "add_rule": (box + ds.add_rule(1.5, label="thr"), {"g", "v"}),
+            "add_text": (box + ds.add_text("hi", position="topLeft"), {"g", "v"}),
+            "add_shade": (box + ds.add_shade(categories=cats), {"g", "v"}),
+            "add_multilabel": (ds.add_multilabel(box, categories=cats), {"g", "v"}),
+            "add_log_ticks": (ds.add_log_ticks(logc, dlog, "y"), {"x", "y"}),
+        }
+        for name, (chart, cols) in charts.items():
+            ds.save(chart, str(tmp_path / name), format="json", background=["light"])
+            got = ds.read(str(tmp_path / f"{name}.json"), what="data")
+            assert isinstance(got, pl.DataFrame), f"{name}: expected one user frame, got {type(got).__name__}"
+            assert cols.issubset(set(got.columns)), f"{name}: missing user cols, got {got.columns}"
+
+    @pytest.fixture
+    def multi_frame_json(self, tmp_path):
+        import dysonsphere as ds
+
+        d1 = pl.DataFrame({"x": [1, 2, 3, 4], "y": [1.0, 2, 3, 4]})
+        d2 = pl.DataFrame({"x": [1, 4], "yhat": [1.1, 3.9]})
+        chart = alt.Chart(d1).mark_point().encode(x="x:Q", y="y:Q") + alt.Chart(d2).mark_line().encode(
+            x="x:Q", y="yhat:Q"
+        )
+        ds.save(chart, str(tmp_path / "m"), format="json", background=["light"])
+        return str(tmp_path / "m.json")
+
+    def test_read_data_multi_frame_raises(self, multi_frame_json):
+        import dysonsphere as ds
+
+        with pytest.raises(ValueError, match="user datasets"):  # refuses to guess
+            ds.read(multi_frame_json, what="data")
+
+    def test_read_data_all_returns_dict(self, multi_frame_json):
+        import dysonsphere as ds
+
+        got = ds.read(multi_frame_json, what="data", dataset="all")
+        assert isinstance(got, dict) and len(got) == 2
+        colsets = sorted(tuple(sorted(f.columns)) for f in got.values())
+        assert colsets == [("x", "y"), ("x", "yhat")]  # both user frames, no internal
+
+    def test_read_data_all_single_frame_still_dict(self, tmp_path):
+        # dataset="all" is predictable: even a 1-frame file returns a dict, not a bare frame
+        import dysonsphere as ds
+
+        got = ds.read(self._data_json(tmp_path), what="data", dataset="all")
+        assert isinstance(got, dict) and len(got) == 1
+
+    def test_read_data_by_name(self, multi_frame_json):
+        import dysonsphere as ds
+
+        names = list(ds.read(multi_frame_json, what="data", dataset="all"))
+        one = ds.read(multi_frame_json, what="data", dataset=names[0])
+        assert isinstance(one, pl.DataFrame)
+
     def test_read_report_save_writes_txt(self, saved, tmp_path):
         import dysonsphere as ds
 
@@ -505,8 +578,10 @@ class TestStatsQueueRobustness:
         import dysonsphere as ds
 
         ds.save(self._stats_layer(), str(tmp_path / "s"), format=["svg", "json"], background=["light"])
-        assert "__dysonsphere_" not in (tmp_path / "s.json").read_text()
-        assert "__dysonsphere_" not in (tmp_path / "s.svg").read_text()
+        # The layer-name marker (a "name" field) must be stripped; check precisely, since the
+        # internal-data sentinel COLUMN "__dysonsphere__" legitimately remains and shares the prefix.
+        assert '"name": "__dysonsphere_' not in (tmp_path / "s.json").read_text()
+        assert "__dysonsphere_" not in (tmp_path / "s.svg").read_text()  # neither marker nor sentinel renders
 
     def test_provenance_has_checksum_and_export(self, simple_chart, tmp_path):
         import dysonsphere as ds

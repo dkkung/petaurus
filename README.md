@@ -420,9 +420,10 @@ ds.read("myplot.png", what="statistics")  # the structured records (exact floats
 ds.read("myplot.json", what="metadata")   # the whole {provenance, statistics, theme, report} dict
 ds.read("myplot.json", what="data")       # the original data, rebuilt from the spec (JSON only)
 ds.read("myplot.json", what="data", output="pandas")   # or "duckdb" / "records"
+ds.read("myplot.json", what="data", dataset="all")     # multi-frame charts → {name: frame}
 ```
 
-`what="report"` (default) even **re-renders the table from the records** if the prose wasn't embedded (`embedReport=False`), so it works on any dysonsphere-saved file. `what="data"` returns the **whole** frame Altair inlined into the JSON — every column you passed to `alt.Chart(df)`, including ones the chart never plotted (so mind what you hand it), dtypes re-inferred from JSON. `output` picks the form: `"polars"` (default), `"pandas"`, `"duckdb"` (a queryable relation), or `"records"` (raw `list[dict]`, no dataframe library needed). `pandas`/`duckdb` are imported only if you ask for them — they're not dependencies.
+`what="report"` (default) even **re-renders the table from the records** if the prose wasn't embedded (`embedReport=False`), so it works on any dysonsphere-saved file. `what="data"` returns the **whole** frame Altair inlined into the JSON — every column you passed to `alt.Chart(df)`, including ones the chart never plotted (so mind what you hand it), dtypes re-inferred from JSON. dysonsphere's composite marks embed small internal sidecar datasets (bracket coords, mean/error bars, …); those are tagged and **filtered out**, so you get back just *your* data. `output` picks the form: `"polars"` (default), `"pandas"`, `"duckdb"` (a queryable relation), or `"records"` (raw `list[dict]`, no dataframe library needed) — `pandas`/`duckdb` are imported only if asked, not dependencies. If a chart genuinely layers **two of your own DataFrames**, `what="data"` **raises** rather than silently returning one; pass `dataset="all"` for a `{name: frame}` dict or `dataset="<name>"` for a specific one.
 
 `ds.load()` rebuilds the chart from the **Vega-Lite JSON** (the `.json` spec):
 
